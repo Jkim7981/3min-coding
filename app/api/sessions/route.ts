@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth, requireTeacher } from '@/lib/auth'
 import { checkSubjectAccess } from '@/lib/access'
 
-// POST /api/lessons - 수업 자료 업로드 (강사)
+// POST /api/sessions - 수업 자료 업로드 (강사)
 export async function POST(req: NextRequest) {
   try {
     const { user, response } = await requireTeacher()
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// GET /api/lessons?subject_id=xxx - 수업 자료 목록 조회
+// GET /api/sessions?subject_id=xxx - 수업 자료 목록 조회
 export async function GET(req: NextRequest) {
   try {
     const { user, response } = await requireAuth()
