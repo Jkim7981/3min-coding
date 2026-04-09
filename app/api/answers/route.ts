@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calculateSM2, getQualityScore } from '@/lib/sm2'
 import { requireAuth } from '@/lib/auth'
+import { normalizeAnswer } from '@/lib/normalize'
 
 // POST /api/answers - 답안 제출
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const { question_id, subject_id, answer } = await req.json()
     const userId = user.id
@@ -39,18 +40,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '문제를 찾을 수 없습니다' }, { status: 404 })
     }
 
-    // 코딩 문제: 따옴표 통일 + 공백 정규화 후 비교
-    // 개념 문제: 대소문자 무시 + 앞뒤 공백 제거
-    const normalize = (s: string, type: string) => {
-      const trimmed = s.trim()
-      if (type === 'coding') {
-        return trimmed.replace(/'/g, '"').replace(/\s+/g, ' ')
-      }
-      return trimmed.toLowerCase()
-    }
-
     const is_correct =
-      normalize(answer, question.type) === normalize(question.answer, question.type)
+      normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)
 
     // 답안 저장
     const { error: answerError } = await supabaseAdmin.from('user_answers').insert({

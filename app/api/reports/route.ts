@@ -6,8 +6,8 @@ import { requireAuth } from '@/lib/auth'
 // GET /api/reports?period=weekly - 취약점 리포트 조회
 export async function GET(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const userId = user.id
     const { searchParams } = new URL(req.url)
@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
 // POST /api/reports - 취약점 리포트 생성 (주간/월간 트리거)
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const userId = user.id
     const { period = 'weekly', subject_id } = await req.json()

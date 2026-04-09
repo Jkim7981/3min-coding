@@ -7,8 +7,8 @@ import { requireAuth, requireTeacher } from '@/lib/auth'
 // GET /api/questions?subject_id=xxx - 오늘의 문제 조회 (학생)
 export async function GET(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const { searchParams } = new URL(req.url)
     const subject_id = searchParams.get('subject_id')
@@ -50,8 +50,8 @@ export async function GET(req: NextRequest) {
 // POST /api/questions - AI 문제 생성 (강사)
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireTeacher()
-    if (error) return error
+    const { user, response } = await requireTeacher()
+    if (response) return response
 
     const { lesson_id, difficulty = 'medium', count = 3 } = await req.json()
 

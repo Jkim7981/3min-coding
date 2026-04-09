@@ -5,8 +5,8 @@ import { requireAuth } from '@/lib/auth'
 // GET /api/subjects - 내 과목 목록 조회
 export async function GET(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     if (user.role === 'teacher') {
       // 강사: 내가 만든 과목 조회

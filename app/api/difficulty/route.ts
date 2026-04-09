@@ -5,8 +5,8 @@ import { requireAuth } from '@/lib/auth'
 // GET /api/difficulty?subject_id=xxx - 학생별 과목별 현재 난이도 조회
 export async function GET(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const { searchParams } = new URL(req.url)
     const subject_id = searchParams.get('subject_id')

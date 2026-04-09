@@ -5,8 +5,8 @@ import { requireAuth, requireTeacher } from '@/lib/auth'
 // POST /api/lessons - 수업 자료 업로드 (강사)
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireTeacher()
-    if (error) return error
+    const { user, response } = await requireTeacher()
+    if (response) return response
 
     const { subject_id, title, content, session_number } = await req.json()
 
@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
 // GET /api/lessons?subject_id=xxx - 수업 자료 목록 조회
 export async function GET(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const { searchParams } = new URL(req.url)
     const subject_id = searchParams.get('subject_id')

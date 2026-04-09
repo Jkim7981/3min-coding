@@ -5,8 +5,8 @@ import { requireAuth } from '@/lib/auth'
 // POST /api/explanation - 2차 오답 시 자동 해설 생성
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const { question, answer, student_answer } = await req.json()
 
