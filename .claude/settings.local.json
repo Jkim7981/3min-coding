@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:jinjoooppa.tistory.com)"
+      "WebFetch(domain:jinjoooppa.tistory.com)",
+      "Bash(xargs sed:*)"
     ]
   }
 }
