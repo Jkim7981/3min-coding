@@ -234,9 +234,3 @@ POST Body
 
 ---
 
-## 아직 미구현 (곧 추가 예정)
-
-| API | 설명 |
-|-----|------|
-| `GET /api/subjects/[id]/sessions` | 특정 과목의 수업 목록 |
-| `GET /api/questions/retry` | 틀린 문제 재출제 |
