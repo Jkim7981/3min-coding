@@ -5,8 +5,8 @@ import { requireAuth } from '@/lib/auth'
 // POST /api/explanation - 2차 오답 시 자동 해설 생성
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { response } = await requireAuth()
+    if (response) return response
 
     const { question, answer, student_answer } = await req.json()
 
@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
     const explanation = completion.choices[0].message.content
 
     return NextResponse.json({ explanation })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '해설 생성 중 오류가 발생했습니다' }, { status: 500 })
   }
 }

@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth, requireTeacher } from '@/lib/auth'
+import { checkSubjectAccess } from '@/lib/access'
 
-// POST /api/lessons - 수업 자료 업로드 (강사)
+// POST /api/sessions - 수업 자료 업로드 (강사)
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireTeacher()
-    if (error) return error
+    const { user, response } = await requireTeacher()
+    if (response) return response
 
     const { subject_id, title, content, session_number } = await req.json()
 
     if (!subject_id || !title || !content) {
       return NextResponse.json({ error: 'subject_id, title, content는 필수입니다' }, { status: 400 })
+    }
+
+    const hasAccess = await checkSubjectAccess(user.id, subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json({ error: '본인 과목에만 자료를 업로드할 수 있습니다' }, { status: 403 })
     }
 
     const { data, error: dbError } = await supabaseAdmin
@@ -23,22 +29,27 @@ export async function POST(req: NextRequest) {
     if (dbError) throw dbError
 
     return NextResponse.json(data)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
 
-// GET /api/lessons?subject_id=xxx - 수업 자료 목록 조회
+// GET /api/sessions?subject_id=xxx - 수업 자료 목록 조회
 export async function GET(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const { searchParams } = new URL(req.url)
     const subject_id = searchParams.get('subject_id')
 
     if (!subject_id) {
       return NextResponse.json({ error: 'subject_id가 필요합니다' }, { status: 400 })
+    }
+
+    const hasAccess = await checkSubjectAccess(user.id, subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 })
     }
 
     const { data, error: dbError } = await supabaseAdmin
@@ -50,7 +61,7 @@ export async function GET(req: NextRequest) {
     if (dbError) throw dbError
 
     return NextResponse.json(data)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }

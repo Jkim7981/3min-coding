@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import openai from '@/lib/openai'
-import { validateQuestions } from '@/lib/validateQuestion'
+import { validateQuestions, Question } from '@/lib/validateQuestion'
 import { requireAuth, requireTeacher } from '@/lib/auth'
+import { checkSubjectAccess } from '@/lib/access'
 
 // GET /api/questions?subject_id=xxx - 오늘의 문제 조회 (학생)
 export async function GET(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     const { searchParams } = new URL(req.url)
     const subject_id = searchParams.get('subject_id')
 
     if (!subject_id) {
       return NextResponse.json({ error: 'subject_id가 필요합니다' }, { status: 400 })
+    }
+
+    const hasAccess = await checkSubjectAccess(user.id, subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 })
     }
 
     // 해당 과목의 lesson_id 목록 먼저 조회 (PostgREST는 관계 테이블 필터 직접 미지원)
@@ -42,7 +48,7 @@ export async function GET(req: NextRequest) {
     if (error) throw error
 
     return NextResponse.json(data)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
@@ -50,20 +56,29 @@ export async function GET(req: NextRequest) {
 // POST /api/questions - AI 문제 생성 (강사)
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireTeacher()
-    if (error) return error
+    const { user, response } = await requireTeacher()
+    if (response) return response
 
     const { lesson_id, difficulty = 'medium', count = 3 } = await req.json()
 
-    // 수업 자료 조회
+    // 수업 자료 조회 (subject_id 포함해서 소유권 확인용)
     const { data: lesson, error: lError } = await supabaseAdmin
       .from('lessons')
-      .select('content, title')
+      .select('content, title, subject_id')
       .eq('id', lesson_id)
       .single()
 
     if (lError || !lesson) {
       return NextResponse.json({ error: '수업 자료를 찾을 수 없습니다' }, { status: 404 })
+    }
+
+    // 이 lesson이 본인 과목 소속인지 확인
+    const hasAccess = await checkSubjectAccess(user.id, lesson.subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: '본인 과목의 수업에만 문제를 생성할 수 있습니다' },
+        { status: 403 }
+      )
     }
 
     // OpenAI로 문제 생성
@@ -122,7 +137,7 @@ ${lesson.content}
     const { data: saved, error: sError } = await supabaseAdmin
       .from('questions')
       .insert(
-        validQuestions.map((q: any) => ({
+        validQuestions.map((q: Question) => ({
           lesson_id,
           type: q.type,
           difficulty: q.difficulty,
@@ -144,8 +159,8 @@ ${lesson.content}
       passed_validation: validQuestions.length,
       rejected: rawQuestions.length - validQuestions.length,
     })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '문제 생성 중 오류가 발생했습니다' }, { status: 500 })
   }
 }

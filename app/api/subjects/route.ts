@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth'
 
 // GET /api/subjects - 내 과목 목록 조회
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
     if (user.role === 'teacher') {
       // 강사: 내가 만든 과목 조회
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       if (dbError) throw dbError
       return NextResponse.json(data)
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
