@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth'
 
 // GET /api/subjects - 내 과목 목록 조회
-export async function GET(_req: NextRequest) {
+export async function GET() {
   try {
     const { user, response } = await requireAuth()
     if (response) return response

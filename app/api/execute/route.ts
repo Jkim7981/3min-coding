@@ -7,7 +7,7 @@ type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 // POST /api/execute - Piston API로 코드 실행
 export async function POST(req: NextRequest) {
   try {
-    const { user, response: authResponse } = await requireAuth()
+    const { response: authResponse } = await requireAuth()
     if (authResponse) return authResponse
 
     const { language, code } = await req.json()

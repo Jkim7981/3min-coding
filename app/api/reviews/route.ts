@@ -5,7 +5,7 @@ import { requireAuth } from '@/lib/auth'
 import { normalizeAnswer } from '@/lib/normalize'
 
 // GET /api/reviews - 오늘 복습할 문제 조회
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const { user, response } = await requireAuth()
     if (response) return response
