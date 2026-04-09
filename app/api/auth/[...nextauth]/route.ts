@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import bcrypt from 'bcryptjs'
 import { supabaseAdmin } from '@/lib/supabase'
 
 const handler = NextAuth({
@@ -20,9 +21,12 @@ const handler = NextAuth({
           .eq('email', credentials.email)
           .single()
 
-        if (error || !user) return null
+        if (error || !user || !user.password_hash) return null
 
-        // TODO: 실제 비밀번호 검증 (bcrypt 적용 예정)
+        // 비밀번호 검증 (bcrypt)
+        const isValid = await bcrypt.compare(credentials.password, user.password_hash)
+        if (!isValid) return null
+
         return {
           id: user.id,
           email: user.email,

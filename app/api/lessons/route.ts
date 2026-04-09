@@ -1,29 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAuth, requireTeacher } from '@/lib/auth'
 
 // POST /api/lessons - 수업 자료 업로드 (강사)
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession()
-    if (!session?.user) {
-      return NextResponse.json({ error: '로그인이 필요합니다' }, { status: 401 })
-    }
-
-    const role = (session.user as any).role
-    if (role !== 'teacher') {
-      return NextResponse.json({ error: '강사만 업로드할 수 있습니다' }, { status: 403 })
-    }
+    const { user, error } = await requireTeacher()
+    if (error) return error
 
     const { subject_id, title, content, session_number } = await req.json()
 
-    const { data, error } = await supabaseAdmin
+    if (!subject_id || !title || !content) {
+      return NextResponse.json({ error: 'subject_id, title, content는 필수입니다' }, { status: 400 })
+    }
+
+    const { data, error: dbError } = await supabaseAdmin
       .from('lessons')
       .insert({ subject_id, title, content, session_number })
       .select()
       .single()
 
-    if (error) throw error
+    if (dbError) throw dbError
 
     return NextResponse.json(data)
   } catch (error) {
@@ -34,21 +31,23 @@ export async function POST(req: NextRequest) {
 // GET /api/lessons?subject_id=xxx - 수업 자료 목록 조회
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession()
-    if (!session?.user) {
-      return NextResponse.json({ error: '로그인이 필요합니다' }, { status: 401 })
-    }
+    const { user, error } = await requireAuth()
+    if (error) return error
 
     const { searchParams } = new URL(req.url)
     const subject_id = searchParams.get('subject_id')
 
-    const { data, error } = await supabaseAdmin
+    if (!subject_id) {
+      return NextResponse.json({ error: 'subject_id가 필요합니다' }, { status: 400 })
+    }
+
+    const { data, error: dbError } = await supabaseAdmin
       .from('lessons')
       .select('*')
       .eq('subject_id', subject_id)
       .order('session_number', { ascending: true })
 
-    if (error) throw error
+    if (dbError) throw dbError
 
     return NextResponse.json(data)
   } catch (error) {

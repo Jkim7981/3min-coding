@@ -1,35 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { requireAuth } from '@/lib/auth'
 
 // GET /api/subjects - 내 과목 목록 조회
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession()
-    if (!session?.user) {
-      return NextResponse.json({ error: '로그인이 필요합니다' }, { status: 401 })
-    }
+    const { user, error } = await requireAuth()
+    if (error) return error
 
-    const userId = (session.user as any).id
-    const role = (session.user as any).role
-
-    if (role === 'teacher') {
+    if (user.role === 'teacher') {
       // 강사: 내가 만든 과목 조회
-      const { data, error } = await supabaseAdmin
+      const { data, error: dbError } = await supabaseAdmin
         .from('subjects')
         .select('*')
-        .eq('teacher_id', userId)
+        .eq('teacher_id', user.id)
 
-      if (error) throw error
+      if (dbError) throw dbError
       return NextResponse.json(data)
     } else {
       // 학생: 수강 중인 과목 조회
-      const { data, error } = await supabaseAdmin
+      const { data, error: dbError } = await supabaseAdmin
         .from('enrollments')
         .select('subject_id, subjects(*)')
-        .eq('student_id', userId)
+        .eq('student_id', user.id)
 
-      if (error) throw error
+      if (dbError) throw dbError
       return NextResponse.json(data)
     }
   } catch (error) {
