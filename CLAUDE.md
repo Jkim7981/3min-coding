@@ -339,6 +339,36 @@ create table weakness_reports (
 - API Route에서 OpenAI 호출 시 에러 핸들링 필수 (try/catch + fallback 메시지)
 - 컴포넌트는 `components/` 폴더, API 로직은 `lib/` 폴더로 분리
 
+## 코드 스타일 (Prettier)
+
+팀원 간 코드 스타일 통일을 위해 Prettier를 사용한다.
+저장 시 자동 포맷팅되도록 VSCode 설정 권장.
+
+**`.prettierrc` 설정:**
+```json
+{
+  "semi": false,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "printWidth": 100,
+  "arrowParens": "always"
+}
+```
+
+**VSCode 설정 (각자 적용):**
+- VSCode에서 `Ctrl+Shift+P` → `Open User Settings (JSON)` 입력
+- 아래 내용 추가:
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
+}
+```
+
+**VSCode 확장 설치:**
+- `Prettier - Code formatter` (esbenp.prettier-vscode) 설치 필수
+
 ---
 
 ## 참고 링크
