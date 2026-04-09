@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import openai from '@/lib/openai'
 import { requireAuth } from '@/lib/auth'
 
-// GET /api/reports?period=weekly - 취약점 리포트 조회
+// GET /api/reports?period=weekly&subject_id=xxx - 취약점 리포트 조회
 export async function GET(req: NextRequest) {
   try {
     const { user, response } = await requireAuth()
@@ -12,12 +12,19 @@ export async function GET(req: NextRequest) {
     const userId = user.id
     const { searchParams } = new URL(req.url)
     const period = searchParams.get('period') || 'weekly'
+    const subject_id = searchParams.get('subject_id')
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('weakness_reports')
       .select('*')
       .eq('student_id', userId)
       .eq('period', period)
+
+    if (subject_id) {
+      query = query.eq('subject_id', subject_id)
+    }
+
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -43,12 +50,18 @@ export async function POST(req: NextRequest) {
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
 
-    const { data: cached } = await supabaseAdmin
+    let cacheQuery = supabaseAdmin
       .from('weakness_reports')
       .select('*')
       .eq('student_id', userId)
       .eq('period', period)
       .gte('created_at', todayStart.toISOString())
+
+    if (subject_id) {
+      cacheQuery = cacheQuery.eq('subject_id', subject_id)
+    }
+
+    const { data: cached } = await cacheQuery
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -67,7 +80,7 @@ export async function POST(req: NextRequest) {
     startDate.setDate(startDate.getDate() - days)
 
     // 해당 기간 오답 데이터 조회
-    const { data: wrongAnswers, error: waError } = await supabaseAdmin
+    let wrongQuery = supabaseAdmin
       .from('user_answers')
       .select(
         `
@@ -90,6 +103,12 @@ export async function POST(req: NextRequest) {
       .eq('is_correct', false)
       .gte('answered_at', startDate.toISOString())
       .order('answered_at', { ascending: false })
+
+    if (subject_id) {
+      wrongQuery = wrongQuery.eq('subject_id', subject_id)
+    }
+
+    const { data: wrongAnswers, error: waError } = await wrongQuery
 
     if (waError) throw waError
 

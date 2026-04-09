@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import openai from '@/lib/openai'
-import { validateQuestions } from '@/lib/validateQuestion'
+import { validateQuestions, Question } from '@/lib/validateQuestion'
 import { requireAuth, requireTeacher } from '@/lib/auth'
 import { checkSubjectAccess } from '@/lib/access'
 
@@ -61,15 +61,24 @@ export async function POST(req: NextRequest) {
 
     const { lesson_id, difficulty = 'medium', count = 3 } = await req.json()
 
-    // 수업 자료 조회
+    // 수업 자료 조회 (subject_id 포함해서 소유권 확인용)
     const { data: lesson, error: lError } = await supabaseAdmin
       .from('lessons')
-      .select('content, title')
+      .select('content, title, subject_id')
       .eq('id', lesson_id)
       .single()
 
     if (lError || !lesson) {
       return NextResponse.json({ error: '수업 자료를 찾을 수 없습니다' }, { status: 404 })
+    }
+
+    // 이 lesson이 본인 과목 소속인지 확인
+    const hasAccess = await checkSubjectAccess(user.id, lesson.subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json(
+        { error: '본인 과목의 수업에만 문제를 생성할 수 있습니다' },
+        { status: 403 }
+      )
     }
 
     // OpenAI로 문제 생성
@@ -128,7 +137,7 @@ ${lesson.content}
     const { data: saved, error: sError } = await supabaseAdmin
       .from('questions')
       .insert(
-        validQuestions.map((q: any) => ({
+        validQuestions.map((q: Question) => ({
           lesson_id,
           type: q.type,
           difficulty: q.difficulty,
