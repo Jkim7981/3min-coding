@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     else if (correctRate < 0.5) difficulty = 'easy'
 
     return NextResponse.json({ difficulty, correct_rate: correctRate })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     if (error && error.code !== 'PGRST116') throw error
 
     return NextResponse.json(data || null)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
@@ -180,8 +180,8 @@ ${JSON.stringify(wrongSummary, null, 2)}
       analysis,
       wrong_count: wrongAnswers.length,
     })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '리포트 생성 중 오류가 발생했습니다' }, { status: 500 })
   }
 }

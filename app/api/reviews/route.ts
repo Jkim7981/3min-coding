@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       reviews: schedules,
       count: schedules.length,
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
         next_review_days: sm2Result.interval_days,
       })
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }

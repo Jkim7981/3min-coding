@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const { user, response } = await requireAuth()
     if (response) return response
 
-    const { question_id, subject_id, answer } = await req.json()
+    const { question_id, answer } = await req.json()
     const userId = user.id
 
     // 서버에서 시도 횟수 직접 계산 (클라이언트 값 신뢰 X)
@@ -29,16 +29,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '이미 2번 시도한 문제입니다' }, { status: 400 })
     }
 
-    // 정답 조회
+    // 정답 + subject_id 서버에서 직접 조회 (클라이언트 값 신뢰 X)
     const { data: question, error: qError } = await supabaseAdmin
       .from('questions')
-      .select('answer, type')
+      .select('answer, type, lessons(subject_id)')
       .eq('id', question_id)
       .single()
 
     if (qError || !question) {
       return NextResponse.json({ error: '문제를 찾을 수 없습니다' }, { status: 404 })
     }
+
+    const subject_id =
+      (question.lessons as unknown as { subject_id: string } | null)?.subject_id ?? null
 
     const is_correct =
       normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)
@@ -123,8 +126,8 @@ export async function POST(req: NextRequest) {
       review_scheduled: reviewScheduled,
       next_review_days: sm2Result?.interval_days ?? null,
     })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }

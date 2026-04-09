@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
       stderr: result.run?.stderr ?? '',
       code: result.run?.code,
     })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '코드 실행 중 오류가 발생했습니다' }, { status: 500 })
   }
 }

@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     if (dbError) throw dbError
 
     return NextResponse.json(data)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
     if (dbError) throw dbError
 
     return NextResponse.json(data)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }

@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
     if (error) throw error
 
     return NextResponse.json(data)
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
@@ -159,8 +159,8 @@ ${lesson.content}
       passed_validation: validQuestions.length,
       rejected: rawQuestions.length - validQuestions.length,
     })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '문제 생성 중 오류가 발생했습니다' }, { status: 500 })
   }
 }

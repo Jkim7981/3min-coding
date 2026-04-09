@@ -33,8 +33,8 @@ export async function POST(req: NextRequest) {
     const explanation = completion.choices[0].message.content
 
     return NextResponse.json({ explanation })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '해설 생성 중 오류가 발생했습니다' }, { status: 500 })
   }
 }
