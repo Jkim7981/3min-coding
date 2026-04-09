@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import openai from '@/lib/openai'
 import { validateQuestions } from '@/lib/validateQuestion'
 import { requireAuth, requireTeacher } from '@/lib/auth'
+import { checkSubjectAccess } from '@/lib/access'
 
 // GET /api/questions?subject_id=xxx - 오늘의 문제 조회 (학생)
 export async function GET(req: NextRequest) {
@@ -15,6 +16,11 @@ export async function GET(req: NextRequest) {
 
     if (!subject_id) {
       return NextResponse.json({ error: 'subject_id가 필요합니다' }, { status: 400 })
+    }
+
+    const hasAccess = await checkSubjectAccess(user.id, subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 })
     }
 
     // 해당 과목의 lesson_id 목록 먼저 조회 (PostgREST는 관계 테이블 필터 직접 미지원)

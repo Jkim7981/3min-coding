@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth'
+import { checkSubjectAccess } from '@/lib/access'
 
 // GET /api/difficulty?subject_id=xxx - 학생별 과목별 현재 난이도 조회
 export async function GET(req: NextRequest) {
@@ -15,7 +16,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'subject_id가 필요합니다' }, { status: 400 })
     }
 
-    // 최근 10문제 정답률 계산
+    const hasAccess = await checkSubjectAccess(user.id, subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 })
+    }
+
     const { data, error: dbError } = await supabaseAdmin
       .from('user_answers')
       .select('is_correct')
@@ -26,7 +31,6 @@ export async function GET(req: NextRequest) {
 
     if (dbError) throw dbError
 
-    // 데이터 없으면 기본값 medium
     if (!data || data.length === 0) {
       return NextResponse.json({ difficulty: 'medium', correct_rate: null })
     }

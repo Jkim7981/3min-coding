@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth, requireTeacher } from '@/lib/auth'
+import { checkSubjectAccess } from '@/lib/access'
 
 // POST /api/lessons - 수업 자료 업로드 (강사)
 export async function POST(req: NextRequest) {
@@ -12,6 +13,11 @@ export async function POST(req: NextRequest) {
 
     if (!subject_id || !title || !content) {
       return NextResponse.json({ error: 'subject_id, title, content는 필수입니다' }, { status: 400 })
+    }
+
+    const hasAccess = await checkSubjectAccess(user.id, subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json({ error: '본인 과목에만 자료를 업로드할 수 있습니다' }, { status: 403 })
     }
 
     const { data, error: dbError } = await supabaseAdmin
@@ -39,6 +45,11 @@ export async function GET(req: NextRequest) {
 
     if (!subject_id) {
       return NextResponse.json({ error: 'subject_id가 필요합니다' }, { status: 400 })
+    }
+
+    const hasAccess = await checkSubjectAccess(user.id, subject_id, user.role)
+    if (!hasAccess) {
+      return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 })
     }
 
     const { data, error: dbError } = await supabaseAdmin
