@@ -1,0 +1,2 @@
+[2026-04-09T09:05:25.914Z] [log] Deprecated as of 10.6.0. initHighlightingOnLoad() is deprecated.  Use highlightAll() instead.
+[2026-04-09T09:05:27.659Z] [error] Refused to display 'https://www.facebook.com/' in a frame because it set 'X-Frame-Options' to 'deny'.
