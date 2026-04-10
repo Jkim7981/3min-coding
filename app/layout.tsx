@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import Providers from '@/components/Providers'
 import Nav from '@/components/Nav'
@@ -6,6 +6,20 @@ import Nav from '@/components/Nav'
 export const metadata: Metadata = {
   title: '3분코딩 — AI 기반 맞춤형 복습',
   description: '코딩 학원생을 위한 AI 맞춤형 복습 웹앱. 하루 3분으로 복습 완료.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: '3분코딩',
+  },
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#185FA5',
 }
 
 export default function RootLayout({
