@@ -70,15 +70,18 @@ export default function AdminBottomNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-100 z-50">
-      <div className="flex">
+    <nav aria-label="강사 하단 메뉴" className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-sm bg-white border-t border-gray-100 z-50">
+      <div className="flex" role="tablist">
         {tabs.map((tab) => {
           const active = isActive(tab.href)
           return (
             <Link
               key={tab.href}
               href={tab.href}
-              className="flex flex-1 flex-col items-center gap-1 py-3 transition-colors"
+              role="tab"
+              aria-selected={active}
+              aria-label={tab.label}
+              className="flex flex-1 flex-col items-center gap-1 py-3 transition-colors focus-visible:outline-none focus-visible:bg-primary-light"
             >
               {tab.icon(active)}
               <span className={`text-[10px] font-medium ${active ? 'text-primary' : 'text-gray-400'}`}>
