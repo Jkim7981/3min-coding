@@ -37,13 +37,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json([])
     }
 
-    // lesson_id 목록으로 문제 조회
-    const { data, error } = await supabaseAdmin
+    // 이미 정답 맞힌 문제 ID 조회 (해당 과목 기준)
+    const { data: correct } = await supabaseAdmin
+      .from('user_answers')
+      .select('question_id')
+      .eq('student_id', user.id)
+      .eq('subject_id', subject_id)
+      .eq('is_correct', true)
+
+    const solvedIds = correct?.map((a) => a.question_id) ?? []
+
+    // 아직 안 푼 문제만 조회
+    let query = supabaseAdmin
       .from('questions')
       .select('*, lessons(title, session_number)')
       .in('lesson_id', lessonIds)
       .order('created_at', { ascending: false })
       .limit(5)
+
+    if (solvedIds.length > 0) {
+      query = query.not('id', 'in', `(${solvedIds.join(',')})`)
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
