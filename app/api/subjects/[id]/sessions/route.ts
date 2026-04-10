@@ -4,12 +4,13 @@ import { requireAuth } from '@/lib/auth'
 import { checkSubjectAccess } from '@/lib/access'
 
 // GET /api/subjects/[id]/sessions - 특정 과목의 수업 자료 목록 조회
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+// frontend-usang: Next.js 16에서 params가 Promise로 변경되어 타입 및 await 수정
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { user, response } = await requireAuth()
     if (response) return response
 
-    const subjectId = params.id
+    const { id: subjectId } = await params
 
     const hasAccess = await checkSubjectAccess(user.id, subjectId, user.role)
     if (!hasAccess) {

@@ -7,6 +7,7 @@ import Link from 'next/link'
 type SessionStatus = 'completed' | 'current' | 'preview' | 'locked'
 
 interface Session {
+  id?: string
   number: number
   title: string
   status: SessionStatus
@@ -110,7 +111,7 @@ function SessionNode({ session, x, y, subjectId }: { session: Session; x: number
 
   if (isClickable) {
     return (
-      <Link href={`/dashboard/questions?subjectId=${subjectId}&session=${session.number}`}>
+      <Link href={`/subjects/${subjectId}/sessions/${session.id ?? session.number}`}>
         {content}
       </Link>
     )
