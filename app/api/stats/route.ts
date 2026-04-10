@@ -29,14 +29,16 @@ export async function GET(req: NextRequest) {
     const correct = answers?.filter((a) => a.is_correct).length ?? 0
     const correct_rate = total > 0 ? Math.round((correct / total) * 100) / 100 : 0
 
-    // 이번 주 푼 문제 수 (월요일 기준)
-    const now = new Date()
-    const monday = new Date(now)
-    monday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
-    monday.setHours(0, 0, 0, 0)
-    const this_week = answers?.filter((a) => new Date(a.answered_at) >= monday).length ?? 0
+    // 이번 주 푼 문제 수 (월요일 기준, KST)
+    const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000)
+    const mondayKST = new Date(nowKST)
+    mondayKST.setUTCDate(nowKST.getUTCDate() - ((nowKST.getUTCDay() + 6) % 7))
+    mondayKST.setUTCHours(0, 0, 0, 0)
+    // monday 기준을 UTC로 역산 (비교는 원본 UTC 타임스탬프 기준)
+    const mondayUTC = new Date(mondayKST.getTime() - 9 * 60 * 60 * 1000)
+    const this_week = answers?.filter((a) => new Date(a.answered_at) >= mondayUTC).length ?? 0
 
-    // 학습 스트릭 계산 (연속 학습 일수)
+    // 학습 스트릭 계산 (연속 학습 일수, KST)
     const streak = calcStreak(answers?.map((a) => a.answered_at) ?? [])
 
     // 과목별 정답률 (subject_id 미지정 시)
@@ -71,17 +73,24 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// 연속 학습 일수 계산
+// UTC 타임스탬프 → KST 날짜 문자열 (YYYY-MM-DD)
+function toKSTDate(timestamp: string): string {
+  return new Date(new Date(timestamp).getTime() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10)
+}
+
+// 연속 학습 일수 계산 (KST 기준)
 function calcStreak(timestamps: string[]): number {
   if (timestamps.length === 0) return 0
 
-  // 날짜만 추출 후 중복 제거
+  // KST 날짜만 추출 후 중복 제거, 최신순 정렬
   const dates = [
-    ...new Set(timestamps.map((t) => new Date(t).toISOString().slice(0, 10))),
-  ].sort((a, b) => b.localeCompare(a)) // 최신순 정렬
+    ...new Set(timestamps.map((t) => toKSTDate(t))),
+  ].sort((a, b) => b.localeCompare(a))
 
-  const today = new Date().toISOString().slice(0, 10)
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+  const today = toKSTDate(new Date().toISOString())
+  const yesterday = toKSTDate(new Date(Date.now() - 86400000).toISOString())
 
   // 오늘 또는 어제 학습 안 했으면 스트릭 0
   if (dates[0] !== today && dates[0] !== yesterday) return 0
