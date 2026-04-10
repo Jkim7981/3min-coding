@@ -1,5 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { NextResponse } from 'next/server'
+// frontend-usang: getServerSession이 JWT의 id/role 필드를 올바르게 읽도록 authOptions 전달
+import { authOptions } from '@/lib/authOptions'
 
 export type AuthUser = {
   id: string
@@ -13,7 +15,7 @@ export type AuthUser = {
 export async function requireAuth(): Promise<
   { user: AuthUser; response: null } | { user: null; response: NextResponse }
 > {
-  const session = await getServerSession()
+  const session = await getServerSession(authOptions)
 
   if (!session?.user) {
     return {
