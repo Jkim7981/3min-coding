@@ -9,6 +9,7 @@ export interface Question {
   answer: string
   hint: string
   explanation: string
+  concept_tags?: string[]
 }
 
 interface ValidationResult {
