@@ -25,9 +25,7 @@ export async function GET() {
           question,
           code_template,
           expected_output,
-          hint,
-          answer,
-          explanation
+          hint
         )
       `
       )
