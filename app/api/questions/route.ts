@@ -110,7 +110,8 @@ ${lesson.content}
       "expected_output": "코딩 문제 예상 출력값, 개념 문제는 null",
       "answer": "정답",
       "hint": "힌트",
-      "explanation": "해설"
+      "explanation": "해설",
+      "concept_tags": ["for문", "리스트"] // 이 문제와 관련된 개념 태그 1~3개 (한국어)
     }
   ]
 }`,
@@ -147,6 +148,7 @@ ${lesson.content}
           answer: q.answer,
           hint: q.hint,
           explanation: q.explanation,
+          concept_tags: q.concept_tags ?? [],
         }))
       )
       .select()

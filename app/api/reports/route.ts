@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
           difficulty,
           question,
           answer,
+          concept_tags,
           lesson_id,
           lessons (
             title,
@@ -127,6 +128,7 @@ export async function POST(req: NextRequest) {
       문제: wa.questions?.question,
       정답: wa.questions?.answer,
       학생답안: wa.answer,
+      개념태그: wa.questions?.concept_tags ?? [],
       과목: wa.questions?.lessons?.subjects?.name,
       수업: wa.questions?.lessons?.title,
     }))
@@ -138,11 +140,12 @@ export async function POST(req: NextRequest) {
           role: 'system',
           content: `너는 학습 분석 전문가야. 학생의 오답 데이터를 보고 취약점을 분석해줘.
 한국어로, 친근하고 구체적으로 작성해.
+각 오답에는 개념태그가 있어. 이 태그를 적극 활용해서 구체적인 약점을 파악해줘.
 분석 결과는 아래 JSON 형식으로만 답해:
 {
-  "weak_concepts": ["취약한 개념1", "취약한 개념2"],
+  "weak_concepts": ["자주 틀린 개념태그 위주로"],
   "weak_types": ["취약한 문제 유형"],
-  "pattern": "전반적인 취약 패턴 설명 (2-3문장)",
+  "pattern": "전반적인 취약 패턴 설명 (2-3문장, 개념 태그 기반으로 구체적으로)",
   "advice": ["조언1", "조언2", "조언3"],
   "encouragement": "격려 메시지 (1문장)"
 }`,
