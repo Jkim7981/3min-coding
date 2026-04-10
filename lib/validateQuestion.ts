@@ -1,9 +1,11 @@
 import openai from '@/lib/openai'
 
-interface Question {
+export interface Question {
   type: string
+  difficulty?: string
   question: string
   code_template?: string | null
+  expected_output?: string | null
   answer: string
   hint: string
   explanation: string
@@ -11,7 +13,7 @@ interface Question {
 
 interface ValidationResult {
   valid: boolean
-  score: number  // 1~5점
+  score: number // 1~5점
   reason?: string
 }
 

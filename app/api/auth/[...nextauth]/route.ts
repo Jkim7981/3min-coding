@@ -3,6 +3,11 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { supabaseAdmin } from '@/lib/supabase'
 
+type SessionUser = {
+  id: string
+  role: 'student' | 'teacher'
+}
+
 const handler = NextAuth({
   providers: [
     CredentialsProvider({
@@ -38,16 +43,17 @@ const handler = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user) {
+      if (user && 'role' in user) {
         token.id = user.id
-        token.role = (user as any).role
+        token.role = user.role
       }
       return token
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id
-        ;(session.user as any).role = token.role
+        const sessionUser = session.user as typeof session.user & SessionUser
+        sessionUser.id = token.id
+        sessionUser.role = token.role
       }
       return session
     },

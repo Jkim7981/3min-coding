@@ -1,0 +1,37 @@
+<svg width="320" height="150" viewBox="0 0 320 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="150" rx="24" fill="white"/>
+  <g filter="url(#shadow)">
+    <path d="M160 23L186 31V57C186 79.8 174.2 97.6 160 106C145.8 97.6 134 79.8 134 57V31L160 23Z" fill="url(#shield)"/>
+    <path d="M160 30L180 36.2V56.3C180 73.9 171.2 88.9 160 95.9C148.8 88.9 140 73.9 140 56.3V36.2L160 30Z" stroke="url(#rim)" stroke-width="3.5"/>
+    <path d="M153.3 65V46.7H159V65H153.3Z" fill="white"/>
+    <path d="M161.7 50.3V46.7H178.2V50.3H172.8V65H167.1V50.3H161.7Z" fill="white"/>
+  </g>
+  <path d="M74.6 126V77.2H89.9V97.9L108.5 77.2H126.8L106.3 99.7L128.3 126H109.1L94.4 107.7L89.9 112.5V126H74.6Z" fill="#173EAA"/>
+  <path d="M131.6 126V77.2H171.7V89.2H146.5V95.6H169.1V106.8H146.5V114H172.6V126H131.6Z" fill="#173EAA"/>
+  <path d="M198.3 127.2C180.7 127.2 169.4 116.9 169.4 101.6C169.4 86.3 180.7 76 198.3 76C215.9 76 227.3 86.3 227.3 101.6C227.3 116.9 215.9 127.2 198.3 127.2ZM198.3 114.7C206.4 114.7 211.5 109.4 211.5 101.6C211.5 93.8 206.4 88.5 198.3 88.5C190.2 88.5 185.2 93.8 185.2 101.6C185.2 109.4 190.2 114.7 198.3 114.7Z" fill="#173EAA"/>
+  <path d="M230.5 126V77.2H245.8V126H230.5Z" fill="#173EAA"/>
+  <path d="M250.7 126V77.2H266V126H250.7Z" fill="#173EAA"/>
+  <path d="M62.5 139.6V133.8H257.5V139.6H62.5Z" fill="#D8DEE9"/>
+  <text x="160" y="148" text-anchor="middle" fill="#707A8B" font-family="Arial, sans-serif" font-size="8.5" letter-spacing="1.8">KOREA INFORMATION TECHNOLOGY ACADEMY</text>
+  <defs>
+    <filter id="shadow" x="123" y="19" width="74" height="98" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="3"/>
+      <feGaussianBlur stdDeviation="4"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0901961 0 0 0 0 0.243137 0 0 0 0 0.666667 0 0 0 0.28 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+    <linearGradient id="shield" x1="160" y1="23" x2="160" y2="106" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C7D3E6"/>
+      <stop offset="0.45" stop-color="#3D5FBD"/>
+      <stop offset="1" stop-color="#173EAA"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="142.5" y1="33" x2="178.5" y2="94.5" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F1F5FB"/>
+      <stop offset="1" stop-color="#6D85C9"/>
+    </linearGradient>
+  </defs>
+</svg>

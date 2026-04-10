@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import openai from '@/lib/openai'
-import { validateQuestions } from '@/lib/validateQuestion'
+import { type Question, validateQuestions } from '@/lib/validateQuestion'
 import { requireAuth, requireTeacher } from '@/lib/auth'
 
 // GET /api/questions?subject_id=xxx - 오늘의 문제 조회 (학생)
@@ -105,7 +105,7 @@ ${lesson.content}
     })
 
     const result = JSON.parse(completion.choices[0].message.content!)
-    const rawQuestions = result.questions
+    const rawQuestions = result.questions as Question[]
 
     // 품질 검증 - 기준 미달 문제 필터링
     const validQuestions = await validateQuestions(rawQuestions)
@@ -122,7 +122,7 @@ ${lesson.content}
     const { data: saved, error: sError } = await supabaseAdmin
       .from('questions')
       .insert(
-        validQuestions.map((q: any) => ({
+        validQuestions.map((q) => ({
           lesson_id,
           type: q.type,
           difficulty: q.difficulty,
