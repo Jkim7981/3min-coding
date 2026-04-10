@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { calculateSM2, getQualityScore } from '@/lib/sm2'
 import { requireAuth } from '@/lib/auth'
+import { normalizeAnswer } from '@/lib/normalize'
 
 // POST /api/answers - 답안 제출
 export async function POST(req: NextRequest) {
   try {
-    const { user, error } = await requireAuth()
-    if (error) return error
+    const { user, response } = await requireAuth()
+    if (response) return response
 
-    const { question_id, subject_id, answer } = await req.json()
+    const { question_id, answer } = await req.json()
     const userId = user.id
 
     // 서버에서 시도 횟수 직접 계산 (클라이언트 값 신뢰 X)
@@ -28,10 +29,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '이미 2번 시도한 문제입니다' }, { status: 400 })
     }
 
-    // 정답 조회
+    // 이미 정답을 맞힌 문제는 재제출 불가 (통계/복습 오염 방지)
+    const { data: alreadyCorrect } = await supabaseAdmin
+      .from('user_answers')
+      .select('id')
+      .eq('student_id', userId)
+      .eq('question_id', question_id)
+      .eq('is_correct', true)
+      .single()
+
+    if (alreadyCorrect) {
+      return NextResponse.json({ error: '이미 정답을 맞힌 문제입니다' }, { status: 400 })
+    }
+
+    // 정답 + subject_id 서버에서 직접 조회 (클라이언트 값 신뢰 X)
     const { data: question, error: qError } = await supabaseAdmin
       .from('questions')
-      .select('answer, type')
+      .select('answer, type, lessons(subject_id)')
       .eq('id', question_id)
       .single()
 
@@ -39,18 +53,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '문제를 찾을 수 없습니다' }, { status: 404 })
     }
 
-    // 코딩 문제: 따옴표 통일 + 공백 정규화 후 비교
-    // 개념 문제: 대소문자 무시 + 앞뒤 공백 제거
-    const normalize = (s: string, type: string) => {
-      const trimmed = s.trim()
-      if (type === 'coding') {
-        return trimmed.replace(/'/g, '"').replace(/\s+/g, ' ')
-      }
-      return trimmed.toLowerCase()
-    }
+    const subject_id =
+      (question.lessons as unknown as { subject_id: string } | null)?.subject_id ?? null
 
     const is_correct =
-      normalize(answer, question.type) === normalize(question.answer, question.type)
+      normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)
 
     // 답안 저장
     const { error: answerError } = await supabaseAdmin.from('user_answers').insert({
@@ -132,8 +139,8 @@ export async function POST(req: NextRequest) {
       review_scheduled: reviewScheduled,
       next_review_days: sm2Result?.interval_days ?? null,
     })
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }
