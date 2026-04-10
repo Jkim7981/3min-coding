@@ -38,20 +38,26 @@ export async function GET() {
       // 강사: 내가 만든 과목 조회
       const { data, error: dbError } = await supabaseAdmin
         .from('subjects')
-        .select('*')
+        .select('id, name, teacher_id, created_at')
         .eq('teacher_id', user.id)
 
       if (dbError) throw dbError
       return NextResponse.json(data)
     } else {
-      // 학생: 수강 중인 과목 조회
+      // 학생: 수강 중인 과목 조회 - 강사와 동일한 shape로 반환
       const { data, error: dbError } = await supabaseAdmin
         .from('enrollments')
-        .select('subject_id, subjects(*)')
+        .select('subjects(id, name, teacher_id, created_at)')
         .eq('student_id', user.id)
 
       if (dbError) throw dbError
-      return NextResponse.json(data)
+
+      // enrollments 래퍼 제거하고 subjects 배열만 반환
+      const subjects = (data ?? [])
+        .map((row) => row.subjects)
+        .filter(Boolean)
+
+      return NextResponse.json(subjects)
     }
   } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })

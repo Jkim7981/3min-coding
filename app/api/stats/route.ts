@@ -61,16 +61,85 @@ export async function GET(req: NextRequest) {
       }))
     }
 
+    // 오늘 복습할 문제 수
+    const todayKST = toKSTDate(new Date().toISOString())
+    let reviewQuery = supabaseAdmin
+      .from('review_schedule')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', user.id)
+      .lte('next_review_date', todayKST)
+
+    if (subject_id) {
+      // review_schedule에 subject_id 없으므로 question → lesson → subject 경로 불필요,
+      // 전체 due_reviews 반환 (과목 필터 시에도 전체 복습 수 표시)
+    }
+
+    const { count: due_reviews } = await reviewQuery
+
+    // 최근 7일 일별 정답률 트렌드 (KST 기준)
+    const recent_accuracy_trend = calcTrend(answers ?? [], 7)
+
+    // 최근 7일 약한 개념 Top 3
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+    let weakQuery = supabaseAdmin
+      .from('user_answers')
+      .select('questions(concept_tags)')
+      .eq('student_id', user.id)
+      .eq('is_correct', false)
+      .gte('answered_at', sevenDaysAgo)
+
+    if (subject_id) {
+      weakQuery = weakQuery.eq('subject_id', subject_id)
+    }
+
+    const { data: wrongAnswers } = await weakQuery
+    const tagCount = new Map<string, number>()
+    for (const row of wrongAnswers ?? []) {
+      const tags = (row.questions as unknown as { concept_tags: string[] } | null)?.concept_tags ?? []
+      for (const tag of tags) {
+        tagCount.set(tag, (tagCount.get(tag) ?? 0) + 1)
+      }
+    }
+    const weak_concepts = Array.from(tagCount.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([concept, count]) => ({ concept, count }))
+
     return NextResponse.json({
       total_answered: total,
       correct_rate,
       streak,
       this_week,
+      due_reviews: due_reviews ?? 0,
+      weak_concepts,
+      recent_accuracy_trend,
       by_subject,
     })
   } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
+}
+
+// 최근 N일 일별 정답률 트렌드
+function calcTrend(
+  answers: { is_correct: boolean; answered_at: string }[],
+  days: number
+): { date: string; correct_rate: number; count: number }[] {
+  const trend: { date: string; correct_rate: number; count: number }[] = []
+
+  for (let i = days - 1; i >= 0; i--) {
+    const date = toKSTDate(new Date(Date.now() - i * 86400000).toISOString())
+    const dayAnswers = answers.filter((a) => toKSTDate(a.answered_at) === date)
+    const count = dayAnswers.length
+    const correct = dayAnswers.filter((a) => a.is_correct).length
+    trend.push({
+      date,
+      correct_rate: count > 0 ? Math.round((correct / count) * 100) / 100 : 0,
+      count,
+    })
+  }
+
+  return trend
 }
 
 // UTC 타임스탬프 → KST 날짜 문자열 (YYYY-MM-DD)
