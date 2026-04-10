@@ -23,6 +23,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    if (code.length > 5000) {
+      return NextResponse.json({ error: '코드는 5000자를 초과할 수 없습니다' }, { status: 400 })
+    }
+
     const pistonResponse = await fetch('https://emkc.org/api/v2/piston/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

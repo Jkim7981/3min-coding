@@ -77,6 +77,18 @@ export async function POST(req: NextRequest) {
 
     const { lesson_id, difficulty = 'medium', count = 3 } = await req.json()
 
+    if (!lesson_id) {
+      return NextResponse.json({ error: 'lesson_id가 필요합니다' }, { status: 400 })
+    }
+
+    if (!['easy', 'medium', 'hard'].includes(difficulty)) {
+      return NextResponse.json({ error: 'difficulty는 easy, medium, hard 중 하나여야 합니다' }, { status: 400 })
+    }
+
+    if (typeof count !== 'number' || count < 1 || count > 10) {
+      return NextResponse.json({ error: 'count는 1~10 사이의 숫자여야 합니다' }, { status: 400 })
+    }
+
     // 수업 자료 조회 (subject_id 포함해서 소유권 확인용)
     const { data: lesson, error: lError } = await supabaseAdmin
       .from('lessons')
