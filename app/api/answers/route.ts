@@ -29,6 +29,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '이미 2번 시도한 문제입니다' }, { status: 400 })
     }
 
+    // 이미 정답을 맞힌 문제는 재제출 불가 (통계/복습 오염 방지)
+    const { data: alreadyCorrect } = await supabaseAdmin
+      .from('user_answers')
+      .select('id')
+      .eq('student_id', userId)
+      .eq('question_id', question_id)
+      .eq('is_correct', true)
+      .single()
+
+    if (alreadyCorrect) {
+      return NextResponse.json({ error: '이미 정답을 맞힌 문제입니다' }, { status: 400 })
+    }
+
     // 정답 + subject_id 서버에서 직접 조회 (클라이언트 값 신뢰 X)
     const { data: question, error: qError } = await supabaseAdmin
       .from('questions')

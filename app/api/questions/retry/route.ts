@@ -40,10 +40,25 @@ export async function GET(req: NextRequest) {
 
     if (dbError) throw dbError
 
-    // 같은 문제 중복 제거 (question_id 기준)
+    // 나중에 정답 맞힌 question_id 목록 조회 (retry 후보에서 제외)
+    let correctQuery = supabaseAdmin
+      .from('user_answers')
+      .select('question_id')
+      .eq('student_id', user.id)
+      .eq('is_correct', true)
+
+    if (subject_id) {
+      correctQuery = correctQuery.eq('subject_id', subject_id)
+    }
+
+    const { data: correctAnswers } = await correctQuery
+    const correctIds = new Set((correctAnswers ?? []).map((a) => a.question_id))
+
+    // 중복 제거 + 나중에 정답 맞힌 문제 제외
     const seen = new Set<string>()
     const unique = (data ?? []).filter((row) => {
       if (seen.has(row.question_id)) return false
+      if (correctIds.has(row.question_id)) return false
       seen.add(row.question_id)
       return true
     })
