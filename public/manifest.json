@@ -1,0 +1,24 @@
+{
+  "name": "3분코딩",
+  "short_name": "3분코딩",
+  "description": "AI 기반 맞춤형 코딩 복습 플랫폼",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#E6F1FB",
+  "theme_color": "#185FA5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

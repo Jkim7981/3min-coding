@@ -1,14 +1,20 @@
 import openai from '@/lib/openai'
 
 export interface Question {
+<<<<<<< HEAD
   type: string
   difficulty?: string
+=======
+  type: 'concept' | 'coding'
+  difficulty: 'easy' | 'medium' | 'hard'
+>>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
   question: string
   code_template?: string | null
   expected_output?: string | null
   answer: string
   hint: string
   explanation: string
+  concept_tags?: string[]
 }
 
 interface ValidationResult {

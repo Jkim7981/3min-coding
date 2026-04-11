@@ -1,8 +1,8 @@
 import NextAuth from 'next-auth'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import bcrypt from 'bcryptjs'
-import { supabaseAdmin } from '@/lib/supabase'
+// frontend-usang: getServerSession에서 authOptions를 공유하기 위해 lib/authOptions.ts로 분리 후 import 추가
+import { authOptions } from '@/lib/authOptions'
 
+<<<<<<< HEAD
 type SessionUser = {
   id: string
   role: 'student' | 'teacher'
@@ -66,5 +66,8 @@ const handler = NextAuth({
   },
   secret: process.env.NEXTAUTH_SECRET,
 })
+=======
+const handler = NextAuth(authOptions)
+>>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 
 export { handler as GET, handler as POST }

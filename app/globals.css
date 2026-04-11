@@ -1,10 +1,26 @@
+<<<<<<< HEAD
 @import 'tailwindcss';
+=======
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+@import "tailwindcss";
+>>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
+
+@theme {
+  /* Korea IT 색상 시스템 */
+  --color-primary: #185FA5;
+  --color-primary-dark: #0C447C;
+  --color-primary-light: #E6F1FB;
+
+  /* 폰트 */
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
 
 :root {
   --background: #f4f7f9;
   --foreground: #081217;
 }
 
+<<<<<<< HEAD
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -42,10 +58,13 @@ html {
   }
 }
 
+=======
+>>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+<<<<<<< HEAD
 }
 
 body::selection {
@@ -55,4 +74,19 @@ body::selection {
 a {
   color: inherit;
   text-decoration: none;
+=======
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 태블릿/PC에서 모바일 앱처럼 중앙 카드 레이아웃 */
+@media (min-width: 640px) {
+  body {
+    background: #d0dff0;
+  }
+}
+
+/* 모바일 터치 피드백 제거 */
+* {
+  -webkit-tap-highlight-color: transparent;
+>>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 }

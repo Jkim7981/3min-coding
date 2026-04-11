@@ -18,10 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (password.length < 6) {
-      return NextResponse.json(
-        { error: '비밀번호는 최소 6자 이상이어야 합니다' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: '비밀번호는 최소 6자 이상이어야 합니다' }, { status: 400 })
     }
 
     if (!['student', 'teacher'].includes(role)) {
@@ -58,8 +55,8 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 }
     )
-  } catch (error) {
-    console.error(error)
+  } catch (err) {
+    console.error(err)
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 }

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import Link from 'next/link'
 import dummyData from '@/data/dummy.json'
 import { LogoMark } from '@/components/ui/logo-mark'
@@ -374,4 +375,23 @@ export default async function Home() {
       </div>
     </main>
   )
+=======
+import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
+import { authOptions } from '@/lib/authOptions'
+
+export default async function RootPage() {
+  const session = await getServerSession(authOptions)
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  const role = (session.user as { role?: string })?.role
+  if (role === 'teacher') {
+    redirect('/admin')
+  }
+
+  redirect('/dashboard')
+>>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 }
