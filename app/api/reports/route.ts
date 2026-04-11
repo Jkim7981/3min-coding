@@ -162,7 +162,13 @@ ${JSON.stringify(wrongSummary, null, 2)}
       response_format: { type: 'json_object' },
     })
 
-    const analysis = JSON.parse(completion.choices[0].message.content!)
+    const rawContent = completion.choices[0]?.message?.content ?? ''
+    let analysis: Record<string, unknown>
+    try {
+      analysis = JSON.parse(rawContent)
+    } catch {
+      analysis = { weak_concepts: [], advice: [], encouragement: '계속 열심히 해봐요!' }
+    }
 
     // 리포트 저장
     const { data: report, error: rError } = await supabaseAdmin

@@ -5,8 +5,6 @@ import { signIn, getSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
-import { UserRole } from '@/types'
-
 type Tab = 'login' | 'signup'
 
 export default function LoginPage() {
@@ -15,7 +13,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [role, setRole] = useState<UserRole>('student')
+  const [academyCode, setAcademyCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -51,7 +49,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name, role }),
+        body: JSON.stringify({ email, password, name, academy_code: academyCode }),
       })
 
       if (!res.ok) {
@@ -162,30 +160,21 @@ export default function LoginPage() {
                   autoComplete="new-password"
                 />
 
-                {/* 역할 선택 */}
+                {/* 학원코드 */}
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold text-gray-700">역할 선택</span>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
-                    {([
-                      { value: 'student', label: '학생', emoji: '📚' },
-                      { value: 'teacher', label: '강사', emoji: '👩‍🏫' },
-                    ] as { value: UserRole; label: string; emoji: string }[]).map((r) => (
-                      <button
-                        key={r.value}
-                        type="button"
-                        onClick={() => setRole(r.value)}
-                        className={[
-                          'flex flex-col items-center gap-1 rounded-xl border-2 py-4 text-sm font-semibold transition-all',
-                          role === r.value
-                            ? 'border-primary bg-primary-light text-primary'
-                            : 'border-gray-200 text-gray-500 hover:border-primary-light',
-                        ].join(' ')}
-                      >
-                        <span className="text-2xl">{r.emoji}</span>
-                        {r.label}
-                      </button>
-                    ))}
-                  </div>
+                  <Input
+                    id="academy-code"
+                    type="text"
+                    label="학원코드"
+                    placeholder="담당 멘토에게 받은 코드 입력 (예: A4AD)"
+                    value={academyCode}
+                    onChange={(e) => setAcademyCode(e.target.value.toUpperCase())}
+                    required
+                    maxLength={4}
+                  />
+                  <p className="text-xs text-gray-400 mt-0.5 pl-1">
+                    코드를 모르시면 담당 멘토에게 문의해주세요
+                  </p>
                 </div>
 
                 {error && <p className="text-sm text-red-500 text-center">{error}</p>}

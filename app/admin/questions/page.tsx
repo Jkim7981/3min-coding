@@ -42,6 +42,12 @@ export default function AdminQuestionsPage() {
   const router = useRouter()
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [loading, setLoading] = useState(true)
+  // [B 수정] API 실패 시 에러 상태를 별도로 관리하도록 추가.
+  // 기존: 과목 API가 배열이 아닌 값을 반환하면 조용히 빈 목록처럼 보여줘서
+  // 실제 에러인지 데이터가 없는 건지 구분이 안 됨.
+  // 수정: error 상태를 두고 API 실패 시 사용자에게 명확한 메시지 표시.
+  const [error, setError] = useState<string | null>(null)
+  const [retryKey, setRetryKey] = useState(0)
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null)
 
@@ -50,7 +56,10 @@ export default function AdminQuestionsPage() {
       try {
         const sRes = await fetch('/api/subjects')
         const sData = await sRes.json()
-        if (!Array.isArray(sData)) return
+        if (!Array.isArray(sData)) {
+          setError('과목 목록을 불러오는 데 실패했습니다.')
+          return
+        }
 
         const subjectsWithLessons = await Promise.all(
           sData.map(async (subject: { id: string; name: string }) => {
@@ -76,7 +85,7 @@ export default function AdminQuestionsPage() {
       }
     }
     loadAll()
-  }, [])
+  }, [retryKey])
 
   const totalQuestions = subjects.reduce(
     (acc, s) => acc + s.lessons.reduce((a, l) => a + l.questions.length, 0),
@@ -88,6 +97,22 @@ export default function AdminQuestionsPage() {
       <div className="min-h-screen bg-primary-light flex flex-col items-center justify-center gap-4">
         <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
         <p className="text-sm text-gray-500">문제 목록 불러오는 중...</p>
+      </div>
+    )
+  }
+
+  // [B 수정] 에러 상태 UI — API 실패 시 빈 화면 대신 명확한 에러 메시지 표시
+  if (error) {
+    return (
+      <div className="min-h-screen bg-primary-light flex flex-col items-center justify-center gap-3 px-5 text-center">
+        <div className="text-4xl">⚠️</div>
+        <p className="text-sm font-semibold text-gray-600">{error}</p>
+        <button
+          onClick={() => { setError(null); setLoading(true); setRetryKey((k) => k + 1) }}
+          className="mt-2 px-5 py-3 rounded-2xl bg-primary text-white text-sm font-bold"
+        >
+          다시 시도
+        </button>
       </div>
     )
   }

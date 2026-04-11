@@ -225,6 +225,14 @@ export default function QuestionPage({
         body: JSON.stringify({ language, code: buildCompletedCode() }),
       })
       const data = await res.json()
+      // [B 수정] res.ok 체크 추가.
+      // 기존: API가 에러(401/400/500 등)를 반환해도 data를 그대로 setExecResult에 넣어서
+      // stdout/stderr가 undefined → 화면에 "(출력 없음)"만 뜨고 실제 에러 원인을 알 수 없었음.
+      // 수정: res.ok가 false면 에러 메시지를 stderr로 매핑해서 화면에 표시.
+      if (!res.ok) {
+        setExecResult({ stdout: '', stderr: data.error ?? '코드 실행에 실패했습니다', code: 1 })
+        return
+      }
       setExecResult(data)
     } catch {
       setExecResult({ stdout: '', stderr: '실행 오류가 발생했습니다', code: 1 })
