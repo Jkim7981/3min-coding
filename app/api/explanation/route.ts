@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 500,
     })
 
-    const explanation = completion.choices[0].message.content
+    const explanation = completion.choices[0]?.message?.content ?? '해설을 생성하지 못했습니다. 다시 시도해주세요.'
 
     return NextResponse.json({ explanation })
   } catch (err) {
