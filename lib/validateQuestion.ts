@@ -14,7 +14,7 @@ export interface Question {
 
 interface ValidationResult {
   valid: boolean
-  score: number  // 1~5점
+  score: number // 1~5점
   reason?: string
 }
 

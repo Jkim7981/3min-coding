@@ -57,15 +57,11 @@ export default function QuestionPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // 개념 문제 답안
   const [answer, setAnswer] = useState('')
-  // 코딩 문제 빈칸 답안 (빈칸 수만큼 배열)
   const [blankAnswers, setBlankAnswers] = useState<string[]>([])
-  // 코드 실행 결과
   const [execResult, setExecResult] = useState<ExecResult | null>(null)
   const [executing, setExecuting] = useState(false)
 
-  // 2단계 오답 플로우
   const [phase, setPhase] = useState<Phase>('answering')
   const [showHint, setShowHint] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -89,7 +85,6 @@ export default function QuestionPage({
   const currentIndex = questions.findIndex((q) => q.id === questionId)
   const nextQuestion = questions[currentIndex + 1]
 
-  // 빈칸 개수에 맞게 배열 초기화
   useEffect(() => {
     if (question?.type === 'coding' && question.code_template) {
       const count = (question.code_template.match(/___/g) || []).length
@@ -126,10 +121,6 @@ export default function QuestionPage({
         body: JSON.stringify({ language, code: buildCompletedCode() }),
       })
       const data = await res.json()
-      // [B 수정] res.ok 체크 추가.
-      // 기존: API가 에러(401/400/500 등)를 반환해도 data를 그대로 setExecResult에 넣어서
-      // stdout/stderr가 undefined → 화면에 "(출력 없음)"만 뜨고 실제 에러 원인을 알 수 없었음.
-      // 수정: res.ok가 false면 에러 메시지를 stderr로 매핑해서 화면에 표시.
       if (!res.ok) {
         setExecResult({ stdout: '', stderr: data.error ?? '코드 실행에 실패했습니다', code: 1 })
         return
@@ -186,10 +177,6 @@ export default function QuestionPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question_id: question.id, student_answer: studentAnswer }),
       })
-      // [B 수정] res.ok 체크 추가.
-      // 기존: API 에러(401/500 등)가 와도 data.explanation을 그대로 읽어서
-      // undefined → '' 로 설정되어 해설 없이 빈 화면만 뜸.
-      // 수정: 에러 시 사용자에게 명확한 메시지 표시.
       if (!res.ok) {
         setExplanation('해설을 불러오지 못했습니다.')
         return
@@ -244,7 +231,6 @@ export default function QuestionPage({
 
   return (
     <div className="min-h-screen bg-primary-light flex flex-col">
-      {/* 헤더 */}
       <div className="flex items-center justify-between px-5 pt-8 pb-3">
         <button onClick={() => router.back()} className="p-1.5 rounded-full hover:bg-white/60 transition-colors">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -260,7 +246,6 @@ export default function QuestionPage({
         </span>
       </div>
 
-      {/* 진행 바 */}
       <div className="px-5 mb-4">
         <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
@@ -271,7 +256,6 @@ export default function QuestionPage({
       </div>
 
       <div className="flex-1 px-5 flex flex-col gap-4 pb-8">
-        {/* 문제 지문 */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <p className="text-base font-semibold text-gray-800 leading-relaxed">{question.question}</p>
           {question.concept_tags && question.concept_tags.length > 0 && (
@@ -285,11 +269,9 @@ export default function QuestionPage({
           )}
         </div>
 
-        {/* ── 코딩 문제: 빈칸 채우기 ── */}
         {question.type === 'coding' && question.code_template && (
           <>
             <div className="bg-gray-900 rounded-2xl shadow-sm overflow-hidden">
-              {/* 코드 헤더 */}
               <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
                 <div className="flex gap-1.5">
                   <span className="w-3 h-3 rounded-full bg-red-500" />
@@ -301,7 +283,6 @@ export default function QuestionPage({
                   <span className="text-xs text-yellow-400">{blankAnswers.length}개 빈칸</span>
                 )}
               </div>
-              {/* 코드 본문 + 인라인 입력 */}
               <pre className="p-4 font-mono text-sm leading-7 text-gray-100 whitespace-pre-wrap overflow-x-auto">
                 {codingParts.map((part, i) => (
                   <span key={i}>
@@ -331,7 +312,6 @@ export default function QuestionPage({
               </pre>
             </div>
 
-            {/* 실행 버튼 */}
             {isAnswerable && (
               <button
                 onClick={handleExecute}
@@ -359,7 +339,6 @@ export default function QuestionPage({
               </button>
             )}
 
-            {/* 실행 결과 */}
             {execResult && (
               <div className="bg-gray-900 rounded-2xl p-4 font-mono text-sm shadow-sm">
                 {execResult.stderr ? (
@@ -387,7 +366,6 @@ export default function QuestionPage({
           </>
         )}
 
-        {/* ── 개념 문제: 텍스트 입력 ── */}
         {question.type === 'concept' && isAnswerable && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <textarea
@@ -403,7 +381,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 1차 오답 메시지 ── */}
         {phase === 'first_wrong' && (
           <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
             <p className="text-orange-700 font-semibold text-sm">🤔 다시 한번 생각해봐!</p>
@@ -413,7 +390,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 힌트 (1차 오답 시만) ── */}
         {phase === 'first_wrong' && question.hint && (
           <div>
             <button
@@ -434,7 +410,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 제출 버튼 ── */}
         {isAnswerable && (
           <div className="flex gap-2">
             {phase === 'first_wrong' && (
@@ -455,7 +430,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 정답 ── */}
         {phase === 'correct' && (
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
@@ -473,7 +447,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 최종 오답 + AI 해설 ── */}
         {phase === 'final_wrong' && (
           <div className="flex flex-col gap-4">
             <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
