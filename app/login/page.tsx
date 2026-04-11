@@ -56,7 +56,7 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.message ?? '회원가입에 실패했습니다.')
+        setError(data.error ?? '회원가입에 실패했습니다.')
         setLoading(false)
         return
       }
@@ -154,11 +154,11 @@ export default function LoginPage() {
                   id="signup-password"
                   type="password"
                   label="비밀번호"
-                  placeholder="8자 이상 입력하세요"
+                  placeholder="6자 이상 입력하세요"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={8}
+                  minLength={6}
                   autoComplete="new-password"
                 />
 
