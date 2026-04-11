@@ -3,6 +3,19 @@
 import { use, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
+interface TestCase {
+  input: unknown[]
+  expected: unknown
+}
+
+interface TestResult {
+  index: number
+  result: string
+  expected: string
+  passed: boolean
+  error?: boolean
+}
+
 interface Question {
   id: string
   type: 'concept' | 'coding'
@@ -10,6 +23,7 @@ interface Question {
   question: string
   code_template?: string
   expected_output?: string
+  test_cases?: TestCase[]
   hint?: string
   concept_tags?: string[]
 }
@@ -18,6 +32,8 @@ interface ExecResult {
   stdout: string
   stderr: string
   code: number
+  test_results?: TestResult[]
+  all_passed?: boolean
 }
 
 type Phase = 'answering' | 'first_wrong' | 'correct' | 'final_wrong'
@@ -121,10 +137,17 @@ export default function QuestionPage({
     setExecuting(true)
     setExecResult(null)
     try {
+      const body: { language: string; code: string; test_cases?: TestCase[] } = {
+        language,
+        code: buildCompletedCode(),
+      }
+      if (question.test_cases && question.test_cases.length > 0) {
+        body.test_cases = question.test_cases
+      }
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language, code: buildCompletedCode() }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       // [B 수정] res.ok 체크 추가.
@@ -365,12 +388,42 @@ export default function QuestionPage({
               <div className="bg-gray-900 rounded-2xl p-4 font-mono text-sm shadow-sm">
                 {execResult.stderr ? (
                   <>
-                    <p className="text-red-400 text-xs mb-2 font-sans">오류</p>
+                    <p className="text-red-400 text-xs mb-2 font-sans font-bold">오류</p>
                     <p className="text-red-300 whitespace-pre-wrap">{execResult.stderr}</p>
                   </>
-                ) : (
+                ) : execResult.test_results && execResult.test_results.length > 0 ? (
+                  // 테스트케이스 모드
                   <>
-                    <p className="text-gray-400 text-xs mb-2 font-sans">실행 결과</p>
+                    <p className="text-gray-400 text-xs mb-3 font-sans font-bold">테스트 결과</p>
+                    <div className="flex flex-col gap-2">
+                      {execResult.test_results.map((tr) => (
+                        <div
+                          key={tr.index}
+                          className={`rounded-xl p-3 border ${tr.passed ? 'border-green-700 bg-green-900/30' : 'border-red-700 bg-red-900/30'}`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-sans font-bold text-gray-300">
+                              테스트 {tr.index}
+                            </span>
+                            <span className={`text-xs font-sans font-bold ${tr.passed ? 'text-green-400' : 'text-red-400'}`}>
+                              {tr.passed ? '✓ 통과' : '✗ 실패'}
+                            </span>
+                          </div>
+                          <div className="flex gap-3 text-xs text-gray-400 font-sans">
+                            <span>결과: <span className={tr.passed ? 'text-green-300' : 'text-red-300'}>{tr.result}</span></span>
+                            {!tr.passed && <span>기댓값: <span className="text-blue-300">{tr.expected}</span></span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className={`text-xs font-sans font-bold mt-3 pt-3 border-t border-gray-700 ${execResult.all_passed ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {execResult.test_results.filter((r) => r.passed).length} / {execResult.test_results.length}개 통과
+                    </p>
+                  </>
+                ) : (
+                  // 일반 실행 모드 (Java 등)
+                  <>
+                    <p className="text-gray-400 text-xs mb-2 font-sans font-bold">실행 결과</p>
                     <p className="text-green-300 whitespace-pre-wrap">{execResult.stdout || '(출력 없음)'}</p>
                     {question.expected_output && (
                       <div className="mt-3 pt-3 border-t border-gray-700">

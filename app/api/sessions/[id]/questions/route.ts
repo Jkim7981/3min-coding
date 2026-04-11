@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const { data, error: dbError } = await supabaseAdmin
       .from('questions')
-      .select('id, type, difficulty, question, code_template, expected_output, hint, concept_tags, created_at')
+      .select('id, type, difficulty, question, code_template, expected_output, test_cases, hint, concept_tags, created_at')
       .eq('lesson_id', lessonId)
       .order('created_at', { ascending: true })
 

@@ -134,15 +134,26 @@ ${lesson.content}
       "type": "concept 또는 coding",
       "difficulty": "${difficulty}",
       "question": "문제 내용",
-      "code_template": "코딩 문제일 때만 빈칸 템플릿 (___사용), 개념 문제는 null",
-      "expected_output": "코딩 문제 예상 출력값, 개념 문제는 null",
-      "answer": "정답",
+      "code_template": "코딩 문제일 때만. 빈칸은 ___로 표시. 함수 정의만 작성하고 print/호출 코드는 넣지 말 것. 개념 문제는 null",
+      "test_cases": [
+        {"input": [인자1, 인자2], "expected": 기댓값},
+        {"input": [인자3, 인자4], "expected": 기댓값2}
+      ],
+      "expected_output": "test_cases[0]의 기댓값을 문자열로. 개념 문제는 null",
+      "answer": "빈칸에 들어갈 정답",
       "hint": "힌트",
       "explanation": "해설",
-      "concept_tags": ["for문", "리스트"] // 이 문제와 관련된 개념 태그 1~3개 (한국어)
+      "concept_tags": ["개념태그1", "개념태그2"]
     }
   ]
-}`,
+}
+
+코딩 문제 작성 규칙:
+- code_template에는 함수 정의만 작성 (print나 함수 호출 코드 절대 포함 금지)
+- test_cases는 반드시 2개 이상 제공
+- input은 항상 배열 형태 (인자가 1개여도 [값] 형태로)
+- expected는 함수의 return 값 (문자열이면 "값", 숫자면 숫자, 리스트면 배열)
+- concept_tags는 한국어로 1~3개`,
         },
       ],
       response_format: { type: 'json_object' },
@@ -183,6 +194,7 @@ ${lesson.content}
           question: q.question,
           code_template: q.code_template,
           expected_output: q.expected_output,
+          test_cases: q.test_cases ?? null,
           answer: q.answer,
           hint: q.hint,
           explanation: q.explanation,
