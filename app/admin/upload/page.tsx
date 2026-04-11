@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ACADEMY_CURRICULUM } from '@/lib/academyData'
 
 interface Subject {
   id: string
@@ -15,11 +16,16 @@ export default function UploadPage() {
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [subjectId, setSubjectId] = useState('')
   const [title, setTitle] = useState('')
-  const [sessionNumber, setSessionNumber] = useState('')
+  // sessionNumber는 자동 계산되어 고정됨 (수동 입력 불가)
+  const [sessionNumber, setSessionNumber] = useState<number | null>(null)
+  const [totalSessions, setTotalSessions] = useState<number | null>(null)
+  const [sessionLoading, setSessionLoading] = useState(false)
+  const [allSessionsDone, setAllSessionsDone] = useState(false)
   const [content, setContent] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [generatingQuestions, setGeneratingQuestions] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
 
@@ -31,6 +37,43 @@ export default function UploadPage() {
       })
       .catch(() => {})
   }, [])
+
+  // 과목 선택 시 → 다음 회차 자동 계산
+  useEffect(() => {
+    if (!subjectId) {
+      setSessionNumber(null)
+      setTotalSessions(null)
+      setAllSessionsDone(false)
+      return
+    }
+
+    const selectedSubject = subjects.find((s) => s.id === subjectId)
+    const curriculum = selectedSubject
+      ? ACADEMY_CURRICULUM.find((c) => c.name === selectedSubject.name)
+      : undefined
+    const maxTotal = curriculum?.totalSessions ?? null
+    setTotalSessions(maxTotal)
+
+    setSessionLoading(true)
+    fetch(`/api/subjects/${subjectId}/sessions`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const maxSession =
+            data.length > 0 ? Math.max(...data.map((s: { session_number?: number }) => s.session_number ?? 0)) : 0
+          const next = maxSession + 1
+          if (maxTotal !== null && next > maxTotal) {
+            setAllSessionsDone(true)
+            setSessionNumber(null)
+          } else {
+            setAllSessionsDone(false)
+            setSessionNumber(next)
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSessionLoading(false))
+  }, [subjectId, subjects])
 
   function readFile(f: File) {
     if (!f.type.startsWith('text/') && !f.name.endsWith('.txt') && !f.name.endsWith('.md')) {
@@ -74,6 +117,7 @@ export default function UploadPage() {
     if (!subjectId) return setError('과목을 선택해주세요')
     if (!title.trim()) return setError('수업 제목을 입력해주세요')
     if (!content.trim()) return setError('수업 자료 내용을 입력하거나 파일을 업로드해주세요')
+    if (sessionNumber === null) return setError('회차 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요')
 
     setLoading(true)
     try {
@@ -84,7 +128,7 @@ export default function UploadPage() {
           subject_id: subjectId,
           title: title.trim(),
           content: content.trim(),
-          session_number: sessionNumber ? Number(sessionNumber) : undefined,
+          session_number: sessionNumber,
         }),
       })
 
@@ -94,11 +138,30 @@ export default function UploadPage() {
         return
       }
 
+      // 업로드 완료 후 자동으로 문제 생성
+      setLoading(false)
+      setGeneratingQuestions(true)
+
+      const qRes = await fetch('/api/questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lesson_id: data.id, difficulty: 'medium', count: 5 }),
+      })
+
+      const qData = await qRes.json()
+      if (!qRes.ok) {
+        setError(qData.error ?? '문제 생성 중 오류가 발생했습니다')
+        setGeneratingQuestions(false)
+        return
+      }
+
+      setGeneratingQuestions(false)
       setSuccess(true)
     } catch {
       setError('네트워크 오류가 발생했습니다')
     } finally {
       setLoading(false)
+      setGeneratingQuestions(false)
     }
   }
 
@@ -106,6 +169,23 @@ export default function UploadPage() {
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  }
+
+  if (generatingQuestions) {
+    return (
+      <div className="min-h-screen bg-primary-light flex flex-col items-center justify-center px-5 gap-6">
+        <div className="relative w-20 h-20">
+          <div className="absolute inset-0 rounded-full border-4 border-primary-light" />
+          <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center text-2xl">🤖</div>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold text-primary-dark">문제 생성 중</p>
+          <p className="text-sm text-gray-500 mt-1">AI가 수업 자료를 분석하고 있어요</p>
+          <p className="text-xs text-gray-400 mt-1">약 10~30초 소요됩니다</p>
+        </div>
+      </div>
+    )
   }
 
   if (success) {
@@ -126,7 +206,12 @@ export default function UploadPage() {
                 setTitle('')
                 setContent('')
                 setFile(null)
-                setSessionNumber('')
+                // sessionNumber는 과목 선택 유지 시 자동 재계산됨 (subjectId useEffect)
+                // subjectId를 초기화하면 함께 리셋됨
+                setSubjectId('')
+                setSessionNumber(null)
+                setTotalSessions(null)
+                setAllSessionsDone(false)
               }}
               className="w-full py-3 rounded-2xl bg-primary text-white text-sm font-semibold"
             >
@@ -183,24 +268,36 @@ export default function UploadPage() {
 
         {/* 수업 정보 */}
         <div className="bg-white rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+          {/* 회차 정보 표시 */}
+          {subjectId && (
+            <div className="flex items-center justify-between bg-primary-light rounded-xl px-3 py-2.5">
+              <span className="text-xs font-semibold text-gray-500">다음 업로드 회차</span>
+              {sessionLoading ? (
+                <span className="text-xs text-gray-400">불러오는 중...</span>
+              ) : allSessionsDone ? (
+                <span className="text-xs font-bold text-green-600">
+                  ✓ 모든 회차 업로드 완료 ({totalSessions}회차)
+                </span>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-primary">
+                    {sessionNumber}회차
+                  </span>
+                  {totalSessions && (
+                    <span className="text-xs text-gray-400">/ 전체 {totalSessions}회차</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-gray-500 mb-1.5">수업 제목 *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="예) 3회차 - 반복문 for/while"
-              className="w-full text-sm text-gray-700 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200 focus:outline-none focus:border-primary"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1.5">회차 번호</label>
-            <input
-              type="number"
-              value={sessionNumber}
-              onChange={(e) => setSessionNumber(e.target.value)}
-              placeholder="예) 3"
-              min={1}
+              placeholder={sessionNumber ? `예) ${sessionNumber}회차 - 반복문 for/while` : '예) 반복문 for/while'}
               className="w-full text-sm text-gray-700 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200 focus:outline-none focus:border-primary"
             />
           </div>
@@ -279,7 +376,7 @@ export default function UploadPage() {
         {/* 제출 */}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || allSessionsDone || sessionNumber === null}
           className="w-full py-4 rounded-2xl bg-primary text-white font-bold text-base shadow-md active:scale-[0.98] transition-transform disabled:opacity-60"
         >
           {loading ? (
@@ -287,8 +384,10 @@ export default function UploadPage() {
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               업로드 중...
             </span>
+          ) : allSessionsDone ? (
+            '모든 회차 업로드 완료'
           ) : (
-            '수업 자료 업로드'
+            `${sessionNumber}회차 수업 자료 업로드`
           )}
         </button>
       </form>
