@@ -149,8 +149,18 @@ ${lesson.content}
       response_format: { type: 'json_object' },
     })
 
-    const result = JSON.parse(completion.choices[0].message.content!)
-    const rawQuestions = result.questions as Question[]
+    let result
+    try {
+      const content = completion.choices[0]?.message?.content
+      if (!content) throw new Error('no content')
+      result = JSON.parse(content)
+    } catch {
+      return NextResponse.json(
+        { error: 'AI 응답 파싱에 실패했습니다. 다시 시도해주세요.' },
+        { status: 422 }
+      )
+    }
+    const rawQuestions = result.questions
 
     // 품질 검증 - 기준 미달 문제 필터링
     const validQuestions = await validateQuestions(rawQuestions)

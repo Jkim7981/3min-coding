@@ -53,8 +53,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '문제를 찾을 수 없습니다' }, { status: 404 })
     }
 
-    const subject_id =
-      (question.lessons as unknown as { subject_id: string } | null)?.subject_id ?? null
+    const lessonsData = question.lessons as unknown as
+      | { subject_id: string }
+      | { subject_id: string }[]
+      | null
+    const subject_id = Array.isArray(lessonsData)
+      ? (lessonsData[0]?.subject_id ?? null)
+      : (lessonsData?.subject_id ?? null)
 
     const is_correct =
       normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)

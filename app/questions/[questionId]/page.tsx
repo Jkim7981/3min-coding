@@ -23,11 +23,23 @@ interface ExecResult {
 
 type Phase = 'answering' | 'first_wrong' | 'correct' | 'final_wrong'
 
-function detectLanguage(tags?: string[]): 'python' | 'javascript' | 'java' {
-  if (!tags) return 'python'
-  const str = tags.join(' ').toLowerCase()
-  if (str.includes('java') && !str.includes('javascript')) return 'java'
-  if (str.includes('javascript') || str.includes('js')) return 'javascript'
+// [B 수정] 언어 감지 로직 개선.
+// 기존: concept_tags의 영어 키워드만 체크했는데, AI가 태그를 한국어("자바", "파이썬")로
+// 생성하면 매칭이 안 돼서 항상 'python'으로 폴백 → 자바 코드를 python으로 Piston에 보내
+// "코드 실행 서버 오류" 발생.
+// 수정: code_template 코드 패턴으로 먼저 감지하고, 태그는 한/영 모두 체크하는 폴백으로.
+function detectLanguage(code?: string, tags?: string[]): 'python' | 'javascript' | 'java' {
+  if (code) {
+    if (code.includes('public class') || code.includes('import java.') || code.includes('System.out')) return 'java'
+    if (code.includes('console.log') || code.includes('function ') || code.includes('const ') || code.includes('let ')) return 'javascript'
+    if (code.includes('def ') || code.includes('print(')) return 'python'
+  }
+  if (tags) {
+    const str = tags.join(' ').toLowerCase()
+    if ((str.includes('java') && !str.includes('javascript')) || str.includes('자바')) return 'java'
+    if (str.includes('javascript') || str.includes('js') || str.includes('자바스크립트')) return 'javascript'
+    if (str.includes('python') || str.includes('파이썬')) return 'python'
+  }
   return 'python'
 }
 
@@ -88,7 +100,7 @@ export default function QuestionPage({
   }, [question])
 
   const codingParts = question?.code_template?.split('___') ?? []
-  const language = detectLanguage(question?.concept_tags)
+  const language = detectLanguage(question?.code_template, question?.concept_tags)
 
   const buildCompletedCode = () => {
     if (!question?.code_template) return ''
@@ -175,6 +187,14 @@ export default function QuestionPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question_id: question.id, student_answer: studentAnswer }),
       })
+      // [B 수정] res.ok 체크 추가.
+      // 기존: API 에러(401/500 등)가 와도 data.explanation을 그대로 읽어서
+      // undefined → '' 로 설정되어 해설 없이 빈 화면만 뜸.
+      // 수정: 에러 시 사용자에게 명확한 메시지 표시.
+      if (!res.ok) {
+        setExplanation('해설을 불러오지 못했습니다.')
+        return
+      }
       const data = await res.json()
       setExplanation(data.explanation ?? '')
     } catch {
