@@ -7,6 +7,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
   hint?: string
+  'aria-describedby'?: string
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -21,6 +22,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={id}
+          aria-invalid={!!error}
+          aria-describedby={
+            error ? `${id}-error` : hint ? `${id}-hint` : undefined
+          }
           className={cn(
             'w-full rounded-lg border px-4 py-2.5 text-base transition-colors',
             'placeholder:text-gray-400',
@@ -32,8 +37,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
           {...props}
         />
-        {hint && !error && <p className="text-xs text-gray-500">{hint}</p>}
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {hint && !error && <p id={`${id}-hint`} className="text-xs text-gray-500">{hint}</p>}
+        {error && <p id={`${id}-error`} role="alert" className="text-xs text-red-500">{error}</p>}
       </div>
     )
   }

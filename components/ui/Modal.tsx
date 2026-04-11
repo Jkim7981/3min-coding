@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useId } from 'react'
 import { cn } from '@/lib/utils'
 import Button from './Button'
 
@@ -16,6 +16,8 @@ interface ModalProps {
 
 export default function Modal({ isOpen, onClose, title, children, hideFooter, className }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
 
   useEffect(() => {
     if (isOpen) {
@@ -30,9 +32,33 @@ export default function Modal({ isOpen, onClose, title, children, hideFooter, cl
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      // 포커스 트랩
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey ? document.activeElement === first : document.activeElement === last) {
+          e.preventDefault()
+          ;(e.shiftKey ? last : first)?.focus()
+        }
+      }
     }
-    if (isOpen) document.addEventListener('keydown', handleKey)
+    if (isOpen) {
+      document.addEventListener('keydown', handleKey)
+      // 모달 열릴 때 첫 번째 포커스 가능 요소로 포커스 이동
+      setTimeout(() => {
+        const first = dialogRef.current?.querySelector<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        first?.focus()
+      }, 50)
+    }
     return () => document.removeEventListener('keydown', handleKey)
   }, [isOpen, onClose])
 
@@ -47,6 +73,7 @@ export default function Modal({ isOpen, onClose, title, children, hideFooter, cl
       }}
     >
       <div
+        ref={dialogRef}
         className={cn(
           'w-full max-w-md rounded-2xl bg-white shadow-xl',
           'animate-in fade-in zoom-in-95 duration-200',
@@ -54,10 +81,11 @@ export default function Modal({ isOpen, onClose, title, children, hideFooter, cl
         )}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          {title && <h2 className="text-lg font-bold text-primary-dark">{title}</h2>}
+          {title && <h2 id={titleId} className="text-lg font-bold text-primary-dark">{title}</h2>}
           <button
             onClick={onClose}
             className="ml-auto rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"

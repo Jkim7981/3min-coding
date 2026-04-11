@@ -55,6 +55,7 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
+    maxAge: 30 * 60, // 30분 (초 단위)
   },
   secret: process.env.NEXTAUTH_SECRET,
 }
