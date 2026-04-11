@@ -149,10 +149,12 @@ ${lesson.content}
 }
 
 코딩 문제 작성 규칙:
-- code_template에는 함수 정의만 작성 (print나 함수 호출 코드 절대 포함 금지)
+- Python/JavaScript: code_template에 함수 정의만 작성. print나 함수 호출 코드 절대 포함 금지
+- Java: code_template에 반드시 "public class Main { public static 반환타입 메서드명(파라미터) { ___ } }" 형태로 작성. main 메서드는 절대 포함 금지
 - test_cases는 반드시 2개 이상 제공
 - input은 항상 배열 형태 (인자가 1개여도 [값] 형태로)
-- expected는 함수의 return 값 (문자열이면 "값", 숫자면 숫자, 리스트면 배열)
+- expected는 함수의 return 값 (문자열이면 "값", 숫자면 숫자, 리스트/배열이면 배열)
+- Java expected는 String.valueOf() 결과와 비교하므로 숫자는 숫자형으로 제공
 - concept_tags는 한국어로 1~3개`,
         },
       ],
