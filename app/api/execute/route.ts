@@ -27,16 +27,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '코드는 5000자를 초과할 수 없습니다' }, { status: 400 })
     }
 
-    const pistonResponse = await fetch('https://emkc.org/api/v2/piston/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        language,
-        version: '*',
-        files: [{ content: code }],
-        stdin: '',
-      }),
-    })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000) // 10초 타임아웃
+
+    let pistonResponse: Response
+    try {
+      pistonResponse = await fetch('https://emkc.org/api/v2/piston/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language,
+          version: '*',
+          files: [{ content: code }],
+          stdin: '',
+        }),
+        signal: controller.signal,
+      })
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') {
+        return NextResponse.json({ error: '코드 실행 시간이 초과됐습니다 (10초)' }, { status: 504 })
+      }
+      throw e
+    } finally {
+      clearTimeout(timeout)
+    }
 
     if (!pistonResponse.ok) {
       return NextResponse.json({ error: '코드 실행 서버 오류가 발생했습니다' }, { status: 502 })
