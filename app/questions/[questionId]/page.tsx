@@ -69,6 +69,9 @@ export default function QuestionPage({
   // 2단계 오답 플로우
   const [phase, setPhase] = useState<Phase>('answering')
   const [showHint, setShowHint] = useState(false)
+  // [C 추가 — A 영역] 힌트 버튼 클릭 여부 추적.
+  // 힌트를 한 번이라도 열면 true로 설정, 답안 제출 시 used_hint로 API에 전달.
+  const [hintUsed, setHintUsed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [explanation, setExplanation] = useState('')
   const [correctAnswer, setCorrectAnswer] = useState('')
@@ -152,7 +155,8 @@ export default function QuestionPage({
       const res = await fetch('/api/answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: question.id, answer: currentAnswer.trim() }),
+        // [C 추가 — A 영역] used_hint 전달 — B의 answers API에서 DB 기록
+        body: JSON.stringify({ question_id: question.id, answer: currentAnswer.trim(), used_hint: hintUsed }),
       })
       const data = await res.json()
 
@@ -418,7 +422,8 @@ export default function QuestionPage({
         {phase === 'first_wrong' && question.hint && (
           <div>
             <button
-              onClick={() => setShowHint((v) => !v)}
+              // [C 추가 — A 영역] 힌트 열릴 때 hintUsed를 true로 설정
+              onClick={() => { setShowHint((v) => !v); setHintUsed(true) }}
               className="text-sm text-primary font-semibold flex items-center gap-1.5"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">

@@ -24,19 +24,31 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [noData, setNoData] = useState(false)
+  // [C 추가] API 에러 상태 — 네트워크/서버 오류 시 사용자에게 메시지 표시
+  const [fetchError, setFetchError] = useState('')
 
   const fetchReport = async (p: Period) => {
     setLoading(true)
     setNoData(false)
     setReport(null)
+    // [C 추가] 에러 초기화
+    setFetchError('')
     try {
       const res = await fetch(`/api/reports?period=${p}`)
+      // [C 추가] 서버 에러(4xx/5xx) 처리
+      if (!res.ok) {
+        setFetchError('리포트를 불러오는 중 오류가 발생했습니다.')
+        return
+      }
       const data = await res.json()
       if (data && data.summary) {
         setReport({ analysis: JSON.parse(data.summary) })
       } else {
         setNoData(true)
       }
+    } catch {
+      // [C 추가] 네트워크 오류 처리
+      setFetchError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
     } finally {
       setLoading(false)
     }
@@ -45,18 +57,28 @@ export default function ReportPage() {
   const generateReport = async () => {
     setGenerating(true)
     setNoData(false)
+    // [C 추가] 에러 초기화
+    setFetchError('')
     try {
       const res = await fetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ period }),
       })
+      // [C 추가] 서버 에러 처리
+      if (!res.ok) {
+        setFetchError('리포트 생성 중 오류가 발생했습니다. 다시 시도해주세요.')
+        return
+      }
       const data = await res.json()
       if (data.message && !data.analysis) {
         setNoData(true)
       } else if (data.analysis) {
         setReport({ analysis: data.analysis, wrong_count: data.wrong_count, cached: data.cached })
       }
+    } catch {
+      // [C 추가] 네트워크 오류 처리
+      setFetchError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
     } finally {
       setGenerating(false)
     }
@@ -91,6 +113,14 @@ export default function ReportPage() {
           {[...Array(4)].map((_, i) => (
             <div key={i} className="bg-white rounded-2xl p-5 shadow-sm h-28 animate-pulse bg-gray-100" />
           ))}
+        </div>
+      )}
+
+      {/* [C 추가] API 에러 메시지 */}
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+          <span className="text-lg">⚠️</span>
+          <p className="text-sm text-red-600">{fetchError}</p>
         </div>
       )}
 
@@ -174,6 +204,13 @@ export default function ReportPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* [C 추가] wrong_count 표시 — 분석 기반 오답 수 안내 */}
+          {report.wrong_count !== undefined && report.wrong_count > 0 && (
+            <p className="text-center text-xs text-gray-400">
+              {period === 'weekly' ? '최근 7일' : '최근 30일'} 오답 <span className="font-bold text-gray-600">{report.wrong_count}개</span> 기반 분석
+            </p>
           )}
 
           {report.cached && (
