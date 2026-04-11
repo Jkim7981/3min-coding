@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import openai from '@/lib/openai'
-<<<<<<< HEAD
-import { type Question, validateQuestions } from '@/lib/validateQuestion'
-=======
+
 import { validateQuestions, Question } from '@/lib/validateQuestion'
->>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 import { requireAuth, requireTeacher } from '@/lib/auth'
 import { checkSubjectAccess } from '@/lib/access'
 
@@ -170,11 +167,7 @@ ${lesson.content}
     const { data: saved, error: sError } = await supabaseAdmin
       .from('questions')
       .insert(
-<<<<<<< HEAD
-        validQuestions.map((q) => ({
-=======
         validQuestions.map((q: Question) => ({
->>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
           lesson_id,
           type: q.type,
           difficulty: q.difficulty,

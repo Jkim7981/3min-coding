@@ -1,9 +1,6 @@
-<<<<<<< HEAD
-@import 'tailwindcss';
-=======
+
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
 @import "tailwindcss";
->>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 
 @theme {
   /* Korea IT 색상 시스템 */
@@ -20,61 +17,12 @@
   --foreground: #081217;
 }
 
-<<<<<<< HEAD
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: 'Segoe UI', 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
-  --font-mono: 'Consolas', 'SFMono-Regular', 'Monaco', monospace;
-}
 
-* {
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes modalRise {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-=======
->>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-<<<<<<< HEAD
-}
 
-body::selection {
-  background: rgba(20, 184, 166, 0.2);
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-=======
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -88,5 +36,4 @@ a {
 /* 모바일 터치 피드백 제거 */
 * {
   -webkit-tap-highlight-color: transparent;
->>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 }
