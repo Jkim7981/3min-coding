@@ -31,6 +31,29 @@ const tabs = [
     ),
   },
   {
+    href: '/dashboard/report',
+    label: '리포트',
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+        <rect
+          x="4"
+          y="3"
+          width="14"
+          height="16"
+          rx="2"
+          stroke={active ? '#185FA5' : '#9CA3AF'}
+          strokeWidth="1.8"
+        />
+        <path
+          d="M7 8h8M7 12h8M7 16h5"
+          stroke={active ? '#185FA5' : '#9CA3AF'}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard/settings',
     label: '설정',
     icon: (active: boolean) => (
