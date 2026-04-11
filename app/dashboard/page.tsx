@@ -29,14 +29,20 @@ export default function DashboardPage() {
   const [loadingStats, setLoadingStats] = useState(true)
 
   useEffect(() => {
+    // [B 수정] res.ok 체크 추가.
+    // 기존: 두 API 모두 에러 응답이 와도 .json()을 그냥 파싱해서
+    // subjects는 조용히 빈 배열 유지, stats는 data.error 구조가 달라 setStats(undefined)가 될 수 있음.
+    // 수정: ok 아닐 때 catch로 넘겨 빈 상태 유지.
     fetch('/api/subjects')
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
       .then((data) => { if (Array.isArray(data)) setSubjects(data) })
+      .catch(() => {})
       .finally(() => setLoadingSubjects(false))
 
     fetch('/api/stats')
-      .then((r) => r.json())
-      .then((data) => { if (!data.error) setStats(data) })
+      .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
+      .then((data) => setStats(data))
+      .catch(() => {})
       .finally(() => setLoadingStats(false))
   }, [])
 

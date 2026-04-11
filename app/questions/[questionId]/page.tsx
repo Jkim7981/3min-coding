@@ -174,6 +174,14 @@ export default function QuestionPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question_id: question.id, student_answer: studentAnswer }),
       })
+      // [B 수정] res.ok 체크 추가.
+      // 기존: API 에러(401/500 등)가 와도 data.explanation을 그대로 읽어서
+      // undefined → '' 로 설정되어 해설 없이 빈 화면만 뜸.
+      // 수정: 에러 시 사용자에게 명확한 메시지 표시.
+      if (!res.ok) {
+        setExplanation('해설을 불러오지 못했습니다.')
+        return
+      }
       const data = await res.json()
       setExplanation(data.explanation ?? '')
     } catch {
