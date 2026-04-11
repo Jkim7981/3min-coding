@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { SubjectCardSkeleton, StatCardSkeleton } from '@/components/ui/Skeleton'
 
@@ -43,9 +43,22 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-5 p-5">
       {/* 헤더 */}
-      <div className="pt-4">
-        <p className="text-sm text-gray-500">안녕하세요!</p>
-        <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{userName}님 👋</h1>
+      <div className="pt-4 flex items-start justify-between">
+        <div>
+          <p className="text-sm text-gray-500">안녕하세요!</p>
+          <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{userName}님 👋</h1>
+        </div>
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mt-1 p-1.5 rounded-xl hover:bg-gray-100"
+          aria-label="로그아웃"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          로그아웃
+        </button>
       </div>
 
       {/* 수강 과목 카드 */}
