@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 
 export default function AdminPage() {
@@ -39,10 +39,23 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-primary-light">
       {/* 헤더 */}
-      <div className="px-5 pt-10 pb-6">
-        <p className="text-sm text-gray-500">안녕하세요,</p>
-        <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{name} 강사님 👋</h1>
-        <p className="text-sm text-gray-400 mt-1">오늘도 좋은 수업 되세요!</p>
+      <div className="px-5 pt-10 pb-6 flex items-start justify-between">
+        <div>
+          <p className="text-sm text-gray-500">안녕하세요,</p>
+          <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{name} 강사님 👋</h1>
+          <p className="text-sm text-gray-400 mt-1">오늘도 좋은 수업 되세요!</p>
+        </div>
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mt-1 p-1.5 rounded-xl hover:bg-white/60"
+          aria-label="로그아웃"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          로그아웃
+        </button>
       </div>
 
       {/* 메뉴 카드 */}
