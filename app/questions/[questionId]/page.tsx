@@ -133,7 +133,7 @@ export default function QuestionPage({
   }
 
   const handleExecute = async () => {
-    if (executing) return
+    if (executing || !question) return
     setExecuting(true)
     setExecResult(null)
     try {
