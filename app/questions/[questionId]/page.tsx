@@ -88,6 +88,7 @@ export default function QuestionPage({
   const question = questions.find((q) => q.id === questionId)
   const currentIndex = questions.findIndex((q) => q.id === questionId)
   const nextQuestion = questions[currentIndex + 1]
+  const prevQuestion = questions[currentIndex - 1]
 
   // 빈칸 개수에 맞게 배열 초기화
   useEffect(() => {
@@ -454,6 +455,32 @@ export default function QuestionPage({
             </button>
           </div>
         )}
+
+        {/* ── 이전 / 다음 네비게이션 (제출 없이 둘러보기) ── */}
+        <div className="flex gap-2 mt-1">
+          <button
+            onClick={() => router.push(`/questions/${prevQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)}
+            disabled={!prevQuestion}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-gray-50"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            이전
+          </button>
+          <button
+            onClick={() => nextQuestion
+              ? router.push(`/questions/${nextQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)
+              : router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
+            }
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors hover:bg-gray-50"
+          >
+            {nextQuestion ? '다음' : '목록'}
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
 
         {/* ── 정답 ── */}
         {phase === 'correct' && (
