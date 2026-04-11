@@ -1,11 +1,4 @@
-<<<<<<< HEAD
-import type { Metadata } from 'next'
-import './globals.css'
 
-export const metadata: Metadata = {
-  title: '코리아IT 학습 대시보드',
-  description: '코리아IT 학습 앱을 위한 디자인 에셋, 더미 데이터, 화면 가이드입니다.',
-=======
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import Providers from '@/components/Providers'
@@ -33,7 +26,6 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
->>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
 }
 
 export default function RootLayout({
@@ -42,10 +34,6 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-<<<<<<< HEAD
-    <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
-=======
     <html lang="ko" className="h-full">
       <body className="min-h-full flex flex-col">
         <Providers>
@@ -58,7 +46,6 @@ export default function RootLayout({
           </footer>
         </Providers>
       </body>
->>>>>>> 864a28694a0ccc77f3168faf30465ff3e71f96a6
     </html>
   )
 }
