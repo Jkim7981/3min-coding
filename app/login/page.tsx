@@ -54,7 +54,7 @@ export default function LoginPage() {
 
       if (!res.ok) {
         const data = await res.json()
-        setError(data.message ?? '회원가입에 실패했습니다.')
+        setError(data.error ?? '회원가입에 실패했습니다.')
         setLoading(false)
         return
       }
