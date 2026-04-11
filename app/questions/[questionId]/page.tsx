@@ -307,6 +307,24 @@ export default function QuestionPage({
               ))}
             </div>
           )}
+
+          {/* 입출력 예시 (코딩 문제 + test_cases 있을 때) */}
+          {question.type === 'coding' && question.test_cases && question.test_cases.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs font-bold text-gray-500 mb-2">입출력 예시</p>
+              <div className="flex flex-col gap-1.5">
+                {question.test_cases.map((tc, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs font-mono bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="text-gray-400 font-sans shrink-0">입력</span>
+                    <span className="text-gray-700">{(tc.input as unknown[]).map(String).join(', ')}</span>
+                    <span className="text-gray-300 shrink-0">→</span>
+                    <span className="text-gray-400 font-sans shrink-0">출력</span>
+                    <span className="text-primary font-bold">{String(tc.expected)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── 코딩 문제: 빈칸 채우기 ── */}
