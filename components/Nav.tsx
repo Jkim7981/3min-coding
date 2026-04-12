@@ -24,9 +24,9 @@ export default function Nav() {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  // 대시보드/과목 페이지는 모바일 바텀 네비 사용
-  const mobileRoutes = ['/dashboard', '/subjects', '/admin']
-  if (mobileRoutes.some((p) => pathname.startsWith(p))) return null
+  // 대시보드/과목/어드민 페이지는 모바일 바텀 네비 사용, 로그인 페이지는 자체 UI 사용
+  const hiddenRoutes = ['/dashboard', '/subjects', '/admin', '/login', '/questions']
+  if (hiddenRoutes.some((p) => pathname.startsWith(p))) return null
 
   const role = (session?.user as any)?.role as string | undefined
   const links = role === 'teacher' ? teacherLinks : studentLinks
