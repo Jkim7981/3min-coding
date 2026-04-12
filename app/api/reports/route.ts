@@ -67,9 +67,15 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (cached) {
+      let analysis = null
+      try {
+        analysis = JSON.parse(cached.summary)
+      } catch {
+        analysis = { summary: cached.summary }
+      }
       return NextResponse.json({
         report: cached,
-        analysis: JSON.parse(cached.summary),
+        analysis,
         cached: true,
       })
     }
