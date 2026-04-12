@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const { user, response } = await requireAuth()
     if (response) return response
 
-    const { question_id, answer } = await req.json()
+    const { question_id, answer, used_hint = false } = await req.json()
     const userId = user.id
 
     // 서버에서 시도 횟수 직접 계산 (클라이언트 값 신뢰 X)
@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
       attempt,
       answer,
       is_correct,
+      used_hint: used_hint && attempt === 1, // 힌트는 1차 시도에서만 기록
     })
 
     if (answerError) throw answerError

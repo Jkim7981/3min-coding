@@ -1,78 +1,150 @@
-import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { getNextQuestionId, getQuestionById } from '@/lib/mock-learning'
+'use client'
 
-export default async function QuestionResultPage(
-  props: PageProps<'/questions/[questionId]/result'>
-) {
-  const { questionId } = await props.params
-  const question = getQuestionById(questionId)
+import { use, useEffect, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 
-  if (!question) {
-    notFound()
+interface Question {
+  id: string
+  type: 'concept' | 'coding'
+  question: string
+  difficulty: 'easy' | 'medium' | 'hard'
+}
+
+export default function QuestionResultPage({
+  params,
+}: {
+  params: Promise<{ questionId: string }>
+}) {
+  const { questionId } = use(params)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  const sessionId = searchParams.get('sessionId') ?? ''
+  const subjectId = searchParams.get('subjectId') ?? ''
+  const isCorrect = searchParams.get('is_correct') === 'true'
+  const correctAnswer = searchParams.get('correct_answer') ?? ''
+  const studentAnswer = searchParams.get('student_answer') ?? ''
+  const nextQuestionId = searchParams.get('nextQuestionId') ?? ''
+
+  const [question, setQuestion] = useState<Question | null>(null)
+  const [explanation, setExplanation] = useState('')
+  const [loadingExplanation, setLoadingExplanation] = useState(false)
+
+  // 세션에서 문제 텍스트 조회
+  useEffect(() => {
+    if (!sessionId) return
+    fetch(`/api/sessions/${sessionId}/questions`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          const q = data.find((q: Question) => q.id === questionId)
+          if (q) setQuestion(q)
+        }
+      })
+      .catch(() => {})
+  }, [sessionId, questionId])
+
+  // 오답 시 AI 해설 자동 조회
+  useEffect(() => {
+    if (isCorrect || !studentAnswer) return
+    setLoadingExplanation(true)
+    fetch('/api/explanation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_id: questionId, student_answer: studentAnswer }),
+    })
+      .then((r) => r.json())
+      .then((data) => setExplanation(data.explanation ?? '해설을 불러오지 못했습니다.'))
+      .catch(() => setExplanation('해설을 불러오지 못했습니다.'))
+      .finally(() => setLoadingExplanation(false))
+  }, [isCorrect, questionId, studentAnswer])
+
+  const handleNext = () => {
+    if (nextQuestionId) {
+      router.push(`/questions/${nextQuestionId}?sessionId=${sessionId}&subjectId=${subjectId}`)
+    } else {
+      router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
+    }
   }
 
-  const isCorrect = question.status === 'completed' || question.status === 'current'
-  const nextQuestionId = getNextQuestionId(questionId)
-
   return (
-    <main className="min-h-screen bg-[#f4f7f9] text-[#081217]">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-5 py-6 sm:px-8 lg:px-10 lg:py-10">
-        <section className="rounded-[2rem] bg-white p-6 shadow-[0_18px_60px_rgba(15,23,42,0.08)] sm:p-8">
-          <p className="text-xs uppercase tracking-[0.34em] text-teal-700">
-            T3-15 결과 및 해설 화면
-          </p>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <span
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                isCorrect
-                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
-                  : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
-              }`}
-            >
-              {isCorrect ? '정답입니다' : '다시 시도해보세요'}
-            </span>
-            <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
-              {question.subjectName} · {question.round}회차
-            </span>
-          </div>
-
-          <h1 className="mt-5 text-3xl font-semibold tracking-tight">{question.title}</h1>
-          <p className="mt-4 text-base leading-8 text-slate-700">{question.prompt}</p>
-
-          <div className="mt-8 rounded-[1.75rem] bg-[#081217] p-6 text-white shadow-[0_18px_50px_rgba(8,18,23,0.18)]">
-            <p className="text-xs uppercase tracking-[0.28em] text-[#5eead4]">AI 생성 해설</p>
-            <p className="mt-4 text-lg font-semibold">{question.correctAnswer}</p>
-            <p className="mt-4 text-sm leading-7 text-white/72">{question.explanation}</p>
-          </div>
-
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            {nextQuestionId ? (
-              <Link
-                href={`/questions/${nextQuestionId}`}
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#0f766e,#14b8a6)] px-6 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(15,118,110,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_28px_rgba(15,118,110,0.28)] active:translate-y-0"
-              >
-                <span>다음 문제</span>
-                <span aria-hidden="true">→</span>
-              </Link>
-            ) : (
-              <Link
-                href="/"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#0f766e,#14b8a6)] px-6 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(15,118,110,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_28px_rgba(15,118,110,0.28)] active:translate-y-0"
-              >
-                <span>홈으로 돌아가기</span>
-                <span aria-hidden="true">→</span>
-              </Link>
-            )}
-            <Link
-              href={`/questions/${questionId}`}
-              className="inline-flex h-12 items-center justify-center rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 active:bg-slate-100"
-            >
-              문제 다시 보기
-            </Link>
-          </div>
-        </section>
+    <div className="min-h-screen bg-primary-light flex flex-col px-5 pt-8 pb-8 gap-4">
+      {/* 결과 배지 */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
+        <div
+          className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 ${
+            isCorrect ? 'bg-green-100' : 'bg-red-100'
+          }`}
+        >
+          {isCorrect ? (
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <path
+                d="M7 17l5 5L25 11"
+                stroke="#16a34a"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : (
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <path
+                d="M10 10l12 12M22 10L10 22"
+                stroke="#dc2626"
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            </svg>
+          )}
+        </div>
+        <p className={`text-xl font-bold ${isCorrect ? 'text-green-600' : 'text-red-500'}`}>
+          {isCorrect ? '정답입니다!' : '아쉬워요!'}
+        </p>
+        {isCorrect && <p className="text-gray-400 text-sm mt-1">+10점</p>}
       </div>
-    </main>
+
+      {/* 문제 내용 */}
+      {question && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <p className="text-xs text-gray-400 mb-2">
+            {question.type === 'concept' ? '개념 문제' : '코딩 문제'}
+          </p>
+          <p className="text-sm font-semibold text-gray-800 leading-relaxed">{question.question}</p>
+        </div>
+      )}
+
+      {/* 정답 표시 (틀렸을 때) */}
+      {!isCorrect && correctAnswer && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <p className="text-xs text-gray-400 mb-1">정답</p>
+          <p className="text-sm font-bold text-gray-800">{correctAnswer}</p>
+        </div>
+      )}
+
+      {/* AI 해설 (틀렸을 때) */}
+      {!isCorrect && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm">
+          <p className="text-sm font-bold text-primary-dark mb-3">AI 해설</p>
+          {loadingExplanation ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
+              해설 생성 중...
+            </div>
+          ) : explanation ? (
+            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+              {explanation}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {/* 다음 문제 버튼 */}
+      <button
+        onClick={handleNext}
+        className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm mt-auto"
+      >
+        {nextQuestionId ? '다음 문제 →' : '목록으로 돌아가기'}
+      </button>
+    </div>
   )
 }

@@ -1,40 +1,47 @@
-'use client'
+import { ButtonHTMLAttributes, ReactNode } from 'react'
 
-import { ButtonHTMLAttributes, forwardRef } from 'react'
-import { cn } from '@/lib/utils'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost'
+type ButtonSize = 'sm' | 'md' | 'lg'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost'
-  size?: 'sm' | 'md' | 'lg'
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  children: ReactNode
+  variant?: ButtonVariant
+  size?: ButtonSize
 }
 
-const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', children, ...props }, ref) => {
-    return (
-      <button
-        ref={ref}
-        className={cn(
-          'inline-flex items-center justify-center rounded-lg font-semibold transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
-          'active:scale-[0.97]',
-          variant === 'primary' && 'bg-primary text-white hover:bg-primary-dark',
-          variant === 'secondary' && 'bg-primary-light text-primary hover:bg-blue-100',
-          variant === 'ghost' && 'bg-transparent text-primary border border-primary hover:bg-primary-light',
-          // 모바일 터치 영역 최소 44px 보장
-          size === 'sm' && 'px-3 py-2 text-sm min-h-[44px]',
-          size === 'md' && 'px-5 py-3 text-base min-h-[44px]',
-          size === 'lg' && 'px-6 py-3.5 text-lg min-h-[44px]',
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </button>
-    )
-  }
-)
+const variantClassName: Record<ButtonVariant, string> = {
+  primary:
+    'bg-primary text-white shadow-[0_4px_14px_rgba(24,95,165,0.35)] hover:-translate-y-0.5 hover:bg-primary-dark active:translate-y-0 active:bg-primary-dark disabled:bg-slate-300 disabled:text-slate-500',
+  secondary:
+    'bg-white text-[#081217] ring-1 ring-slate-200 hover:-translate-y-0.5 hover:bg-slate-50 active:translate-y-0 active:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400',
+  ghost:
+    'bg-transparent text-[#0f766e] ring-1 ring-[#99f6e4] hover:bg-[#ccfbf1] active:bg-[#99f6e4] disabled:border-slate-200 disabled:text-slate-400 disabled:ring-slate-200',
+}
 
-Button.displayName = 'Button'
+const sizeClassName: Record<ButtonSize, string> = {
+  sm: 'h-10 px-4 text-sm',
+  md: 'h-12 px-5 text-sm',
+  lg: 'h-14 px-6 text-base',
+}
+
+export function Button({
+  children,
+  className = '',
+  size = 'md',
+  type = 'button',
+  variant = 'primary',
+  ...props
+}: ButtonProps) {
+  return (
+    <button
+      type={type}
+      className={`inline-flex items-center justify-center rounded-full font-semibold tracking-[-0.01em] transition duration-200 ease-out disabled:cursor-not-allowed ${sizeClassName[size]} ${variantClassName[variant]} ${className}`}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+}
 
 export default Button
+export type { ButtonProps, ButtonSize, ButtonVariant }

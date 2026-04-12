@@ -20,7 +20,7 @@ interface ExecResult {
   code: number
 }
 
-type Phase = 'answering' | 'first_wrong' | 'correct' | 'final_wrong'
+type Phase = 'answering' | 'first_wrong'
 
 // [B 수정] 언어 감지 로직 개선.
 // 기존: concept_tags의 영어 키워드만 체크했는데, AI가 태그를 한국어("자바", "파이썬")로
@@ -65,8 +65,6 @@ export default function QuestionPage({
   const [phase, setPhase] = useState<Phase>('answering')
   const [showHint, setShowHint] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [explanation, setExplanation] = useState('')
-  const [correctAnswer, setCorrectAnswer] = useState('')
   const [firstAttemptAnswer, setFirstAttemptAnswer] = useState('')
 
   useEffect(() => {
@@ -142,7 +140,11 @@ export default function QuestionPage({
       const res = await fetch('/api/answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: question.id, answer: currentAnswer.trim() }),
+        body: JSON.stringify({
+          question_id: question.id,
+          answer: currentAnswer.trim(),
+          used_hint: showHint, // [A 추가] 힌트 사용 여부 DB 기록
+        }),
       })
       const data = await res.json()
 
@@ -152,15 +154,30 @@ export default function QuestionPage({
       }
 
       if (data.is_correct) {
-        setPhase('correct')
+        // 정답 → result 페이지로 이동
+        const params = new URLSearchParams({
+          is_correct: 'true',
+          sessionId,
+          subjectId,
+          ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
+        })
+        router.push(`/questions/${question.id}/result?${params}`)
       } else if (phase === 'answering') {
+        // 1차 오답 → 재시도 기회
         setFirstAttemptAnswer(currentAnswer)
         if (question.type === 'concept') setAnswer('')
         setPhase('first_wrong')
       } else {
-        setCorrectAnswer(data.correct_answer ?? '')
-        setPhase('final_wrong')
-        fetchExplanation(currentAnswer)
+        // 2차 오답 → result 페이지로 이동 (해설은 result 페이지에서 생성)
+        const params = new URLSearchParams({
+          is_correct: 'false',
+          correct_answer: data.correct_answer ?? '',
+          student_answer: currentAnswer,
+          sessionId,
+          subjectId,
+          ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
+        })
+        router.push(`/questions/${question.id}/result?${params}`)
       }
     } catch {
       setError('네트워크 오류가 발생했습니다')
@@ -169,32 +186,6 @@ export default function QuestionPage({
     }
   }
 
-  const fetchExplanation = async (studentAnswer: string) => {
-    if (!question) return
-    try {
-      const res = await fetch('/api/explanation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: question.id, student_answer: studentAnswer }),
-      })
-      if (!res.ok) {
-        setExplanation('해설을 불러오지 못했습니다.')
-        return
-      }
-      const data = await res.json()
-      setExplanation(data.explanation ?? '')
-    } catch {
-      setExplanation('해설을 불러오지 못했습니다.')
-    }
-  }
-
-  const handleNext = () => {
-    if (nextQuestion) {
-      router.push(`/questions/${nextQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)
-    } else {
-      router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
-    }
-  }
 
   if (loading) {
     return (
@@ -430,54 +421,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {phase === 'correct' && (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M7 17l5 5L25 11" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <p className="text-xl font-bold text-green-600">정답입니다!</p>
-              <p className="text-gray-400 text-sm mt-1">+10점</p>
-            </div>
-            <button onClick={handleNext} className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm">
-              {nextQuestion ? '다음 문제 →' : '목록으로 돌아가기'}
-            </button>
-          </div>
-        )}
-
-        {phase === 'final_wrong' && (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M10 10l12 12M22 10L10 22" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-              </div>
-              <p className="text-xl font-bold text-red-500">아쉬워요!</p>
-              {correctAnswer && (
-                <p className="text-sm text-gray-500 mt-2">
-                  정답: <span className="font-bold text-gray-700">{correctAnswer}</span>
-                </p>
-              )}
-            </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm">
-              <p className="text-sm font-bold text-primary-dark mb-3">AI 해설</p>
-              {explanation ? (
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{explanation}</p>
-              ) : (
-                <div className="flex items-center gap-2 text-gray-400 text-sm">
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
-                  해설 생성 중...
-                </div>
-              )}
-            </div>
-            <button onClick={handleNext} className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm">
-              {nextQuestion ? '다음 문제 →' : '목록으로 돌아가기'}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )
