@@ -29,6 +29,7 @@ export default function QuestionResultPage({
   const [question, setQuestion] = useState<Question | null>(null)
   const [explanation, setExplanation] = useState('')
   const [loadingExplanation, setLoadingExplanation] = useState(false)
+  const [explanationError, setExplanationError] = useState(false)
 
   // 세션에서 문제 텍스트 조회
   useEffect(() => {
@@ -44,19 +45,34 @@ export default function QuestionResultPage({
       .catch(() => {})
   }, [sessionId, questionId])
 
-  // 오답 시 AI 해설 자동 조회
+  // 오답 시 AI 해설 자동 조회 (30초 타임아웃)
   useEffect(() => {
     if (isCorrect || !studentAnswer) return
     setLoadingExplanation(true)
+    setExplanationError(false)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30000)
+
     fetch('/api/explanation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question_id: questionId, student_answer: studentAnswer }),
+      signal: controller.signal,
     })
-      .then((r) => r.json())
-      .then((data) => setExplanation(data.explanation ?? '해설을 불러오지 못했습니다.'))
-      .catch(() => setExplanation('해설을 불러오지 못했습니다.'))
-      .finally(() => setLoadingExplanation(false))
+      .then((r) => {
+        if (!r.ok) throw new Error('API 오류')
+        return r.json()
+      })
+      .then((data) => {
+        if (data.explanation) setExplanation(data.explanation)
+        else setExplanationError(true)
+      })
+      .catch(() => setExplanationError(true))
+      .finally(() => {
+        clearTimeout(timeout)
+        setLoadingExplanation(false)
+      })
   }, [isCorrect, questionId, studentAnswer])
 
   const handleNext = () => {
@@ -128,8 +144,12 @@ export default function QuestionResultPage({
           {loadingExplanation ? (
             <div className="flex items-center gap-2 text-gray-400 text-sm">
               <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
-              해설 생성 중...
+              해설 생성 중... (최대 30초)
             </div>
+          ) : explanationError ? (
+            <p className="text-sm text-gray-400 leading-relaxed">
+              해설을 불러오지 못했습니다. 정답: <span className="font-semibold text-gray-600">{correctAnswer}</span>
+            </p>
           ) : explanation ? (
             <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
               {explanation}

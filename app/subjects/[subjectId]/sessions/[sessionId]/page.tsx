@@ -72,14 +72,21 @@ export default function SessionQuestionsPage({
       </div>
 
       <div className="px-5 flex flex-col gap-4">
-        {/* 진행 바 */}
+        {/* 문제 현황 */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <div className="flex justify-between text-xs text-gray-500 mb-2">
-            <span>총 {questions.length}문제</span>
+          <div className="flex justify-between text-xs text-gray-500 mb-3">
+            <span className="font-semibold text-gray-700">총 {questions.length}문제</span>
             <span>개념 {conceptCount} · 코딩 {codingCount}</span>
           </div>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full w-0 transition-all" />
+          <div className="flex gap-2">
+            <div className="flex-1 bg-blue-50 rounded-xl px-3 py-2 text-center">
+              <p className="text-lg font-bold text-blue-600">{conceptCount}</p>
+              <p className="text-[10px] text-blue-400 font-medium">개념</p>
+            </div>
+            <div className="flex-1 bg-purple-50 rounded-xl px-3 py-2 text-center">
+              <p className="text-lg font-bold text-purple-600">{codingCount}</p>
+              <p className="text-[10px] text-purple-400 font-medium">코딩</p>
+            </div>
           </div>
         </div>
 

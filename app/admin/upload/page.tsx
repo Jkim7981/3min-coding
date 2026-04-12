@@ -120,6 +120,11 @@ export default function UploadPage() {
     if (sessionNumber === null) return setError('회차 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요')
 
     setLoading(true)
+
+    // 업로드 15초 타임아웃
+    const uploadController = new AbortController()
+    const uploadTimeout = setTimeout(() => uploadController.abort(), 15000)
+
     try {
       const res = await fetch('/api/sessions', {
         method: 'POST',
@@ -130,7 +135,9 @@ export default function UploadPage() {
           content: content.trim(),
           session_number: sessionNumber,
         }),
+        signal: uploadController.signal,
       })
+      clearTimeout(uploadTimeout)
 
       const data = await res.json()
       if (!res.ok) {
@@ -138,27 +145,48 @@ export default function UploadPage() {
         return
       }
 
-      // 업로드 완료 후 자동으로 문제 생성
+      // 업로드 완료 후 자동으로 문제 생성 (AI 처리 60초 타임아웃)
       setLoading(false)
       setGeneratingQuestions(true)
 
-      const qRes = await fetch('/api/questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lesson_id: data.id, difficulty: 'medium', count: 5 }),
-      })
+      const genController = new AbortController()
+      const genTimeout = setTimeout(() => genController.abort(), 60000)
 
-      const qData = await qRes.json()
-      if (!qRes.ok) {
-        setError(qData.error ?? '문제 생성 중 오류가 발생했습니다')
+      try {
+        const qRes = await fetch('/api/questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lesson_id: data.id, difficulty: 'medium', count: 5 }),
+          signal: genController.signal,
+        })
+        clearTimeout(genTimeout)
+
+        const qData = await qRes.json()
+        if (!qRes.ok) {
+          setError(qData.error ?? '문제 생성 중 오류가 발생했습니다')
+          setGeneratingQuestions(false)
+          return
+        }
+      } catch (err) {
+        clearTimeout(genTimeout)
+        if (err instanceof Error && err.name === 'AbortError') {
+          setError('문제 생성 시간이 초과됐습니다. 다시 시도해주세요.')
+        } else {
+          throw err
+        }
         setGeneratingQuestions(false)
         return
       }
 
       setGeneratingQuestions(false)
       setSuccess(true)
-    } catch {
-      setError('네트워크 오류가 발생했습니다')
+    } catch (err) {
+      clearTimeout(uploadTimeout)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('업로드 시간이 초과됐습니다. 다시 시도해주세요.')
+      } else {
+        setError('네트워크 오류가 발생했습니다')
+      }
     } finally {
       setLoading(false)
       setGeneratingQuestions(false)
@@ -202,16 +230,12 @@ export default function UploadPage() {
           <div className="flex flex-col gap-2">
             <button
               onClick={() => {
+                // 과목 선택은 유지 — 같은 과목 다음 회차 연속 업로드 편의성
+                // subjectId useEffect가 자동으로 다음 sessionNumber 재계산
                 setSuccess(false)
                 setTitle('')
                 setContent('')
                 setFile(null)
-                // sessionNumber는 과목 선택 유지 시 자동 재계산됨 (subjectId useEffect)
-                // subjectId를 초기화하면 함께 리셋됨
-                setSubjectId('')
-                setSessionNumber(null)
-                setTotalSessions(null)
-                setAllSessionsDone(false)
               }}
               className="w-full py-3 rounded-2xl bg-primary text-white text-sm font-semibold"
             >

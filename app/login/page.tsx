@@ -121,11 +121,15 @@ export default function LoginPage() {
     }
 
     setLoading(true)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000) // 15초 타임아웃
+
     try {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, name, academy_code: academyCode }),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -139,9 +143,15 @@ export default function LoginPage() {
       const session = await getSession()
       const userRole = (session?.user as { role?: string })?.role
       router.push(userRole === 'teacher' ? '/admin' : '/dashboard')
-    } catch {
-      setError('네트워크 오류가 발생했습니다.')
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('요청 시간이 초과됐습니다. 다시 시도해주세요.')
+      } else {
+        setError('네트워크 오류가 발생했습니다.')
+      }
       setLoading(false)
+    } finally {
+      clearTimeout(timeout)
     }
   }
 

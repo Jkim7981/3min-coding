@@ -1,0 +1,116 @@
+{
+  "subjects": [
+    {
+      "id": "subject-python-001",
+      "name": "파이썬 기초",
+      "weeklyAccuracy": 78,
+      "progress": 65,
+      "sessions": [
+        {
+          "title": "1회차: 변수와 자료형",
+          "questions": [
+            { "id": "q001", "title": "정수형 변수 선언", "type": "concept", "difficulty": "easy", "status": "completed" },
+            { "id": "q002", "title": "문자열 슬라이싱", "type": "coding", "difficulty": "easy", "status": "completed" },
+            { "id": "q003", "title": "리스트와 튜플 차이", "type": "concept", "difficulty": "medium", "status": "review" }
+          ]
+        },
+        {
+          "title": "2회차: 조건문과 반복문",
+          "questions": [
+            { "id": "q004", "title": "if-elif-else 구조", "type": "concept", "difficulty": "easy", "status": "completed" },
+            { "id": "q005", "title": "for 반복문 빈칸 채우기", "type": "coding", "difficulty": "medium", "status": "completed" },
+            { "id": "q006", "title": "while 무한루프 탈출", "type": "coding", "difficulty": "medium", "status": "review" }
+          ]
+        },
+        {
+          "title": "3회차: 함수",
+          "questions": [
+            { "id": "q007", "title": "함수 정의와 호출", "type": "concept", "difficulty": "easy", "status": "completed" },
+            { "id": "q008", "title": "재귀 함수 구현", "type": "coding", "difficulty": "hard", "status": "current" },
+            { "id": "q009", "title": "람다 함수", "type": "coding", "difficulty": "hard", "status": "preview" }
+          ]
+        },
+        {
+          "title": "4회차: 리스트 고급",
+          "questions": [
+            { "id": "q010", "title": "리스트 컴프리헨션", "type": "coding", "difficulty": "medium", "status": "preview" },
+            { "id": "q011", "title": "sorted와 key 함수", "type": "coding", "difficulty": "medium", "status": "locked" },
+            { "id": "q012", "title": "enumerate 사용법", "type": "concept", "difficulty": "easy", "status": "locked" }
+          ]
+        },
+        {
+          "title": "5회차: 딕셔너리와 집합",
+          "questions": [
+            { "id": "q013", "title": "딕셔너리 키-값 접근", "type": "concept", "difficulty": "easy", "status": "locked" },
+            { "id": "q014", "title": "집합 교집합/합집합", "type": "coding", "difficulty": "medium", "status": "locked" },
+            { "id": "q015", "title": "딕셔너리 컴프리헨션", "type": "coding", "difficulty": "hard", "status": "locked" }
+          ]
+        },
+        {
+          "title": "6회차: 파일 입출력",
+          "questions": [
+            { "id": "q016", "title": "파일 읽기/쓰기", "type": "concept", "difficulty": "medium", "status": "locked" },
+            { "id": "q017", "title": "with 구문 활용", "type": "coding", "difficulty": "medium", "status": "locked" },
+            { "id": "q018", "title": "CSV 파일 처리", "type": "coding", "difficulty": "hard", "status": "locked" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subject-js-002",
+      "name": "자바스크립트 기초",
+      "weeklyAccuracy": 62,
+      "progress": 42,
+      "sessions": [
+        {
+          "title": "1회차: 변수와 타입",
+          "questions": [
+            { "id": "q019", "title": "var vs let vs const", "type": "concept", "difficulty": "easy", "status": "completed" },
+            { "id": "q020", "title": "타입 변환 (암묵적/명시적)", "type": "concept", "difficulty": "medium", "status": "completed" },
+            { "id": "q021", "title": "템플릿 리터럴", "type": "coding", "difficulty": "easy", "status": "completed" }
+          ]
+        },
+        {
+          "title": "2회차: 함수와 스코프",
+          "questions": [
+            { "id": "q022", "title": "화살표 함수 문법", "type": "coding", "difficulty": "easy", "status": "completed" },
+            { "id": "q023", "title": "클로저 개념", "type": "concept", "difficulty": "hard", "status": "review" },
+            { "id": "q024", "title": "호이스팅 이해", "type": "concept", "difficulty": "medium", "status": "review" }
+          ]
+        },
+        {
+          "title": "3회차: 배열 메서드",
+          "questions": [
+            { "id": "q025", "title": "map, filter, reduce", "type": "coding", "difficulty": "medium", "status": "current" },
+            { "id": "q026", "title": "배열 비구조화 할당", "type": "coding", "difficulty": "medium", "status": "preview" },
+            { "id": "q027", "title": "spread 연산자", "type": "coding", "difficulty": "medium", "status": "locked" }
+          ]
+        },
+        {
+          "title": "4회차: 객체와 프로토타입",
+          "questions": [
+            { "id": "q028", "title": "객체 리터럴 생성", "type": "concept", "difficulty": "easy", "status": "locked" },
+            { "id": "q029", "title": "프로토타입 체인", "type": "concept", "difficulty": "hard", "status": "locked" },
+            { "id": "q030", "title": "ES6 클래스 문법", "type": "coding", "difficulty": "hard", "status": "locked" }
+          ]
+        },
+        {
+          "title": "5회차: 비동기 처리",
+          "questions": [
+            { "id": "q031", "title": "콜백 함수", "type": "concept", "difficulty": "medium", "status": "locked" },
+            { "id": "q032", "title": "Promise 체이닝", "type": "coding", "difficulty": "hard", "status": "locked" },
+            { "id": "q033", "title": "async/await 패턴", "type": "coding", "difficulty": "hard", "status": "locked" }
+          ]
+        },
+        {
+          "title": "6회차: DOM 조작",
+          "questions": [
+            { "id": "q034", "title": "querySelector 활용", "type": "coding", "difficulty": "easy", "status": "locked" },
+            { "id": "q035", "title": "이벤트 리스너 등록", "type": "coding", "difficulty": "medium", "status": "locked" },
+            { "id": "q036", "title": "동적 DOM 생성", "type": "coding", "difficulty": "medium", "status": "locked" }
+          ]
+        }
+      ]
+    }
+  ]
+}
