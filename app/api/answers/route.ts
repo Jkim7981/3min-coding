@@ -61,18 +61,26 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// 개념 문제 의미 비교 — 정규화 후에도 다를 때 OpenAI로 최종 판단
-async function isSameMeaning(studentAnswer: string, correctAnswer: string): Promise<boolean> {
+// 의미 비교 — 정규화 후에도 다를 때 OpenAI로 최종 판단
+// 개념 문제: 표현이 달라도 같은 뜻이면 정답
+// 코딩 문제: 다른 문법/방식이라도 같은 동작이면 정답 (format() vs f-string 등)
+async function isSameMeaning(
+  studentAnswer: string,
+  correctAnswer: string,
+  questionType: 'concept' | 'coding' = 'concept'
+): Promise<boolean> {
   try {
+    const systemPrompt =
+      questionType === 'coding'
+        ? '너는 코딩 교육 채점 도우미야. 학생 코드와 모범 코드가 같은 동작을 하는지 판단해. ' +
+          '문법이나 방식이 달라도(f-string vs format() 등) 결과가 동일하면 true, 다르면 false만 반환해. 다른 말은 하지 마.'
+        : '너는 코딩 교육 채점 도우미야. 학생 답안과 모범 답안이 같은 의미인지 판단해. ' +
+          '표현이 달라도 의미가 같으면 true, 다르면 false만 반환해. 다른 말은 하지 마.'
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
-        {
-          role: 'system',
-          content:
-            '너는 코딩 교육 채점 도우미야. 학생 답안과 모범 답안이 같은 의미인지 판단해. ' +
-            '표현이 달라도 의미가 같으면 true, 다르면 false만 반환해. 다른 말은 하지 마.',
-        },
+        { role: 'system', content: systemPrompt },
         {
           role: 'user',
           content: `모범 답안: "${correctAnswer}"\n학생 답안: "${studentAnswer}"`,
@@ -153,9 +161,11 @@ export async function POST(req: NextRequest) {
     let is_correct =
       normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)
 
-    // 2차: 개념 문제이고 정규화로 오답 처리됐을 때 → OpenAI 의미 비교 (폴백)
-    if (!is_correct && question.type === 'concept') {
-      is_correct = await isSameMeaning(answer, question.answer)
+    // 2차: 정규화로 오답 처리됐을 때 → OpenAI 의미 비교 (폴백)
+    // 코딩 문제: format() vs f-string 등 표현 방식이 달라도 의미상 동일한 경우 처리
+    // 개념 문제: 표현이 달라도 같은 뜻인 경우 처리
+    if (!is_correct) {
+      is_correct = await isSameMeaning(answer, question.answer, question.type)
     }
 
     // 답안 저장
