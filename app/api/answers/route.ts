@@ -10,7 +10,10 @@ export async function POST(req: NextRequest) {
     const { user, response } = await requireAuth()
     if (response) return response
 
-    const { question_id, answer } = await req.json()
+    // [C 추가 — B 영역] used_hint 수신 추가.
+    // 힌트 버튼 클릭 여부를 DB에 기록하기 위해 클라이언트에서 전달받음.
+    // 기존 question_id, answer 외에 used_hint(boolean) 추가로 받음.
+    const { question_id, answer, used_hint = false } = await req.json()
     const userId = user.id
 
     // 서버에서 시도 횟수 직접 계산 (클라이언트 값 신뢰 X)
@@ -65,6 +68,8 @@ export async function POST(req: NextRequest) {
       normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)
 
     // 답안 저장
+    // [C 추가 — B 영역] used_hint 필드 insert에 포함.
+    // 기존 insert에 used_hint 추가. 기본값 false이므로 기존 동작 유지됨.
     const { error: answerError } = await supabaseAdmin.from('user_answers').insert({
       student_id: userId,
       question_id,
@@ -72,6 +77,7 @@ export async function POST(req: NextRequest) {
       attempt,
       answer,
       is_correct,
+      used_hint,
     })
 
     if (answerError) throw answerError

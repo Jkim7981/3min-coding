@@ -21,7 +21,6 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           variant === 'primary' && 'bg-primary text-white hover:bg-primary-dark',
           variant === 'secondary' && 'bg-primary-light text-primary hover:bg-blue-100',
           variant === 'ghost' && 'bg-transparent text-primary border border-primary hover:bg-primary-light',
-          // 모바일 터치 영역 최소 44px 보장
           size === 'sm' && 'px-3 py-2 text-sm min-h-[44px]',
           size === 'md' && 'px-5 py-3 text-base min-h-[44px]',
           size === 'lg' && 'px-6 py-3.5 text-lg min-h-[44px]',

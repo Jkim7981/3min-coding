@@ -172,7 +172,7 @@ ${lesson.content}
         { status: 422 }
       )
     }
-    const rawQuestions = result.questions
+    const rawQuestions = result.questions as Question[]
 
     // 품질 검증 - 기준 미달 문제 필터링
     const validQuestions = await validateQuestions(rawQuestions)

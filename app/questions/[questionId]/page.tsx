@@ -36,7 +36,7 @@ interface ExecResult {
   all_passed?: boolean
 }
 
-type Phase = 'answering' | 'first_wrong' | 'correct' | 'final_wrong'
+type Phase = 'answering' | 'first_wrong'
 
 // [B 수정] 언어 감지 로직 개선.
 // 기존: concept_tags의 영어 키워드만 체크했는데, AI가 태그를 한국어("자바", "파이썬")로
@@ -73,20 +73,17 @@ export default function QuestionPage({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // 개념 문제 답안
   const [answer, setAnswer] = useState('')
-  // 코딩 문제 빈칸 답안 (빈칸 수만큼 배열)
   const [blankAnswers, setBlankAnswers] = useState<string[]>([])
-  // 코드 실행 결과
   const [execResult, setExecResult] = useState<ExecResult | null>(null)
   const [executing, setExecuting] = useState(false)
 
-  // 2단계 오답 플로우
   const [phase, setPhase] = useState<Phase>('answering')
   const [showHint, setShowHint] = useState(false)
+  // [C 추가 — A 영역] 힌트 버튼 클릭 여부 추적.
+  // 힌트를 한 번이라도 열면 true로 설정, 답안 제출 시 used_hint로 API에 전달.
+  const [hintUsed, setHintUsed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [explanation, setExplanation] = useState('')
-  const [correctAnswer, setCorrectAnswer] = useState('')
   const [firstAttemptAnswer, setFirstAttemptAnswer] = useState('')
 
   useEffect(() => {
@@ -106,7 +103,6 @@ export default function QuestionPage({
   const nextQuestion = questions[currentIndex + 1]
   const prevQuestion = questions[currentIndex - 1]
 
-  // 빈칸 개수에 맞게 배열 초기화
   useEffect(() => {
     if (question?.type === 'coding' && question.code_template) {
       const count = (question.code_template.match(/___/g) || []).length
@@ -150,10 +146,6 @@ export default function QuestionPage({
         body: JSON.stringify(body),
       })
       const data = await res.json()
-      // [B 수정] res.ok 체크 추가.
-      // 기존: API가 에러(401/400/500 등)를 반환해도 data를 그대로 setExecResult에 넣어서
-      // stdout/stderr가 undefined → 화면에 "(출력 없음)"만 뜨고 실제 에러 원인을 알 수 없었음.
-      // 수정: res.ok가 false면 에러 메시지를 stderr로 매핑해서 화면에 표시.
       if (!res.ok) {
         setExecResult({ stdout: '', stderr: data.error ?? '코드 실행에 실패했습니다', code: 1 })
         return
@@ -175,7 +167,8 @@ export default function QuestionPage({
       const res = await fetch('/api/answers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: question.id, answer: currentAnswer.trim() }),
+        // [C 추가 — A 영역] used_hint 전달 — B의 answers API에서 DB 기록
+        body: JSON.stringify({ question_id: question.id, answer: currentAnswer.trim(), used_hint: hintUsed }),
       })
       const data = await res.json()
 
@@ -185,15 +178,30 @@ export default function QuestionPage({
       }
 
       if (data.is_correct) {
-        setPhase('correct')
+        // 정답 → result 페이지로 이동
+        const params = new URLSearchParams({
+          is_correct: 'true',
+          sessionId,
+          subjectId,
+          ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
+        })
+        router.push(`/questions/${question.id}/result?${params}`)
       } else if (phase === 'answering') {
+        // 1차 오답 → 재시도 기회
         setFirstAttemptAnswer(currentAnswer)
         if (question.type === 'concept') setAnswer('')
         setPhase('first_wrong')
       } else {
-        setCorrectAnswer(data.correct_answer ?? '')
-        setPhase('final_wrong')
-        fetchExplanation(currentAnswer)
+        // 2차 오답 → result 페이지로 이동 (해설은 result 페이지에서 생성)
+        const params = new URLSearchParams({
+          is_correct: 'false',
+          correct_answer: data.correct_answer ?? '',
+          student_answer: currentAnswer,
+          sessionId,
+          subjectId,
+          ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
+        })
+        router.push(`/questions/${question.id}/result?${params}`)
       }
     } catch {
       setError('네트워크 오류가 발생했습니다')
@@ -202,36 +210,6 @@ export default function QuestionPage({
     }
   }
 
-  const fetchExplanation = async (studentAnswer: string) => {
-    if (!question) return
-    try {
-      const res = await fetch('/api/explanation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question_id: question.id, student_answer: studentAnswer }),
-      })
-      // [B 수정] res.ok 체크 추가.
-      // 기존: API 에러(401/500 등)가 와도 data.explanation을 그대로 읽어서
-      // undefined → '' 로 설정되어 해설 없이 빈 화면만 뜸.
-      // 수정: 에러 시 사용자에게 명확한 메시지 표시.
-      if (!res.ok) {
-        setExplanation('해설을 불러오지 못했습니다.')
-        return
-      }
-      const data = await res.json()
-      setExplanation(data.explanation ?? '')
-    } catch {
-      setExplanation('해설을 불러오지 못했습니다.')
-    }
-  }
-
-  const handleNext = () => {
-    if (nextQuestion) {
-      router.push(`/questions/${nextQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)
-    } else {
-      router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
-    }
-  }
 
   if (loading) {
     return (
@@ -268,7 +246,6 @@ export default function QuestionPage({
 
   return (
     <div className="min-h-screen bg-primary-light flex flex-col">
-      {/* 헤더 */}
       <div className="flex items-center justify-between px-5 pt-8 pb-3">
         <button onClick={() => router.back()} className="p-1.5 rounded-full hover:bg-white/60 transition-colors">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -284,7 +261,6 @@ export default function QuestionPage({
         </span>
       </div>
 
-      {/* 진행 바 */}
       <div className="px-5 mb-4">
         <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
           <div
@@ -295,7 +271,6 @@ export default function QuestionPage({
       </div>
 
       <div className="flex-1 px-5 flex flex-col gap-4 pb-8">
-        {/* 문제 지문 */}
         <div className="bg-white rounded-2xl p-5 shadow-sm">
           <p className="text-base font-semibold text-gray-800 leading-relaxed">{question.question}</p>
           {question.concept_tags && question.concept_tags.length > 0 && (
@@ -327,11 +302,9 @@ export default function QuestionPage({
           )}
         </div>
 
-        {/* ── 코딩 문제: 빈칸 채우기 ── */}
         {question.type === 'coding' && question.code_template && (
           <>
             <div className="bg-gray-900 rounded-2xl shadow-sm overflow-hidden">
-              {/* 코드 헤더 */}
               <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
                 <div className="flex gap-1.5">
                   <span className="w-3 h-3 rounded-full bg-red-500" />
@@ -343,7 +316,6 @@ export default function QuestionPage({
                   <span className="text-xs text-yellow-400">{blankAnswers.length}개 빈칸</span>
                 )}
               </div>
-              {/* 코드 본문 + 인라인 입력 */}
               <pre className="p-4 font-mono text-sm leading-7 text-gray-100 whitespace-pre-wrap overflow-x-auto">
                 {codingParts.map((part, i) => (
                   <span key={i}>
@@ -373,7 +345,6 @@ export default function QuestionPage({
               </pre>
             </div>
 
-            {/* 실행 버튼 */}
             {isAnswerable && (
               <button
                 onClick={handleExecute}
@@ -401,7 +372,6 @@ export default function QuestionPage({
               </button>
             )}
 
-            {/* 실행 결과 */}
             {execResult && (
               <div className="bg-gray-900 rounded-2xl p-4 font-mono text-sm shadow-sm">
                 {execResult.stderr ? (
@@ -459,7 +429,6 @@ export default function QuestionPage({
           </>
         )}
 
-        {/* ── 개념 문제: 텍스트 입력 ── */}
         {question.type === 'concept' && isAnswerable && (
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
             <textarea
@@ -475,7 +444,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 1차 오답 메시지 ── */}
         {phase === 'first_wrong' && (
           <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
             <p className="text-orange-700 font-semibold text-sm">🤔 다시 한번 생각해봐!</p>
@@ -485,11 +453,11 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 힌트 (1차 오답 시만) ── */}
         {phase === 'first_wrong' && question.hint && (
           <div>
             <button
-              onClick={() => setShowHint((v) => !v)}
+              // [C 추가 — A 영역] 힌트 열릴 때 hintUsed를 true로 설정
+              onClick={() => { setShowHint((v) => !v); setHintUsed(true) }}
               className="text-sm text-primary font-semibold flex items-center gap-1.5"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -506,7 +474,6 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 제출 버튼 ── */}
         {isAnswerable && (
           <div className="flex gap-2">
             {phase === 'first_wrong' && (
@@ -527,7 +494,7 @@ export default function QuestionPage({
           </div>
         )}
 
-        {/* ── 이전 / 다음 네비게이션 (제출 없이 둘러보기) ── */}
+        {/* ── 이전 / 다음 네비게이션 [B 추가] ── */}
         <div className="flex gap-2 mt-1">
           <button
             onClick={() => router.push(`/questions/${prevQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)}
@@ -552,57 +519,6 @@ export default function QuestionPage({
             </svg>
           </button>
         </div>
-
-        {/* ── 정답 ── */}
-        {phase === 'correct' && (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M7 17l5 5L25 11" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <p className="text-xl font-bold text-green-600">정답입니다!</p>
-              <p className="text-gray-400 text-sm mt-1">+10점</p>
-            </div>
-            <button onClick={handleNext} className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm">
-              {nextQuestion ? '다음 문제 →' : '목록으로 돌아가기'}
-            </button>
-          </div>
-        )}
-
-        {/* ── 최종 오답 + AI 해설 ── */}
-        {phase === 'final_wrong' && (
-          <div className="flex flex-col gap-4">
-            <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M10 10l12 12M22 10L10 22" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-              </div>
-              <p className="text-xl font-bold text-red-500">아쉬워요!</p>
-              {correctAnswer && (
-                <p className="text-sm text-gray-500 mt-2">
-                  정답: <span className="font-bold text-gray-700">{correctAnswer}</span>
-                </p>
-              )}
-            </div>
-            <div className="bg-white rounded-2xl p-5 shadow-sm">
-              <p className="text-sm font-bold text-primary-dark mb-3">AI 해설</p>
-              {explanation ? (
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{explanation}</p>
-              ) : (
-                <div className="flex items-center gap-2 text-gray-400 text-sm">
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
-                  해설 생성 중...
-                </div>
-              )}
-            </div>
-            <button onClick={handleNext} className="w-full py-3.5 rounded-xl bg-primary text-white font-bold text-sm">
-              {nextQuestion ? '다음 문제 →' : '목록으로 돌아가기'}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )

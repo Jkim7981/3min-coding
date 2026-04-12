@@ -19,20 +19,26 @@ const tabs = [
       </svg>
     ),
   },
+  // [C 수정 — A 영역] "자료 업로드" 탭 → "과목" 탭으로 변경.
+  // 과목별 수강생 현황 + 업로드를 한 페이지에서 관리하도록 구조 개선.
   {
-    href: '/admin/upload',
-    label: '자료 업로드',
+    href: '/admin/subjects',
+    label: '과목',
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <path
-          d="M11 14V6M11 6l-4 4M11 6l4 4"
+        <rect
+          x="3" y="2" width="10" height="13" rx="1.5"
           stroke={active ? '#185FA5' : '#9CA3AF'}
           strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+        />
+        <rect
+          x="9" y="7" width="10" height="13" rx="1.5"
+          fill="white"
+          stroke={active ? '#185FA5' : '#9CA3AF'}
+          strokeWidth="1.8"
         />
         <path
-          d="M3 16v1a2 2 0 002 2h12a2 2 0 002-2v-1"
+          d="M12 11h4M12 14h4"
           stroke={active ? '#185FA5' : '#9CA3AF'}
           strokeWidth="1.8"
           strokeLinecap="round"
