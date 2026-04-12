@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Question {
   id: string
@@ -41,6 +41,8 @@ const typeLabel: Record<string, { label: string; color: string }> = {
 
 export default function AdminQuestionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const filterSubjectId = searchParams.get('subjectId')
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [loading, setLoading] = useState(true)
   // [B 수정] API 실패 시 에러 상태를 별도로 관리하도록 추가.
@@ -52,7 +54,7 @@ export default function AdminQuestionsPage() {
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null)
 
-  // 초기 로드: 과목 + 회차만 (문제는 lazy)
+  // 초기 로드: 과목 + 회차 + 문제 수 (처음부터 문제 수 표시)
   useEffect(() => {
     async function loadAll() {
       try {
@@ -67,17 +69,26 @@ export default function AdminQuestionsPage() {
           sData.map(async (subject: { id: string; name: string }) => {
             const lRes = await fetch(`/api/subjects/${subject.id}/sessions`)
             const lData = await lRes.json()
-            const lessons: Lesson[] = Array.isArray(lData)
-              ? lData.map((l: { id: string; title: string; session_number?: number }) => ({
-                  ...l,
-                  questions: null, // 회차 열 때 lazy 로드
-                }))
-              : []
+            const lessons: Lesson[] = await Promise.all(
+              (Array.isArray(lData) ? lData : []).map(
+                async (l: { id: string; title: string; session_number?: number }) => {
+                  const qRes = await fetch(`/api/sessions/${l.id}/questions`)
+                  const qData = await qRes.json()
+                  return {
+                    ...l,
+                    questions: Array.isArray(qData) ? qData : [],
+                  }
+                }
+              )
+            )
             return { ...subject, lessons }
           })
         )
 
-        setSubjects(subjectsWithLessons)
+        const filtered = filterSubjectId
+          ? subjectsWithLessons.filter((s) => s.id === filterSubjectId)
+          : subjectsWithLessons
+        setSubjects(filtered)
       } finally {
         setLoading(false)
       }
@@ -85,50 +96,6 @@ export default function AdminQuestionsPage() {
     loadAll()
   }, [retryKey])
 
-  // 회차 펼칠 때 문제 lazy 로드
-  useEffect(() => {
-    if (!expandedLesson) return
-
-    // 이미 로드됐으면 스킵
-    const lesson = subjects.flatMap((s) => s.lessons).find((l) => l.id === expandedLesson)
-    if (!lesson || lesson.questions !== null) return
-
-    // 로딩 상태 표시
-    setSubjects((prev) =>
-      prev.map((s) => ({
-        ...s,
-        lessons: s.lessons.map((l) =>
-          l.id === expandedLesson ? { ...l, loadingQuestions: true } : l
-        ),
-      }))
-    )
-
-    fetch(`/api/sessions/${expandedLesson}/questions`)
-      .then((r) => r.json())
-      .then((data) => {
-        setSubjects((prev) =>
-          prev.map((s) => ({
-            ...s,
-            lessons: s.lessons.map((l) =>
-              l.id === expandedLesson
-                ? { ...l, questions: Array.isArray(data) ? data : [], loadingQuestions: false }
-                : l
-            ),
-          }))
-        )
-      })
-      .catch(() => {
-        setSubjects((prev) =>
-          prev.map((s) => ({
-            ...s,
-            lessons: s.lessons.map((l) =>
-              l.id === expandedLesson ? { ...l, questions: [], loadingQuestions: false } : l
-            ),
-          }))
-        )
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedLesson])
 
   // 로드된 문제만 집계
   const totalQuestions = subjects.reduce(
@@ -165,16 +132,29 @@ export default function AdminQuestionsPage() {
     <div className="min-h-screen bg-primary-light">
       {/* 헤더 */}
       <div className="flex items-center justify-between px-5 pt-8 pb-4">
-        <div>
-          <p className="text-xs text-gray-400 font-medium">강사 관리</p>
-          <h1 className="text-lg font-bold text-primary-dark">생성된 문제</h1>
+        <div className="flex items-center gap-2">
+          {filterSubjectId && (
+            <button
+              onClick={() => router.back()}
+              className="p-1.5 rounded-full hover:bg-white/60 transition-colors"
+              aria-label="뒤로가기"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M13 4l-6 6 6 6" stroke="#185FA5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+          <div>
+            <p className="text-xs text-gray-400 font-medium">강사 관리</p>
+            <h1 className="text-lg font-bold text-primary-dark">생성된 문제</h1>
+          </div>
         </div>
         <div className="bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-full">
           {totalQuestions > 0 ? `총 ${totalQuestions}문제` : '문제 탭하여 확인'}
         </div>
       </div>
 
-      {subjects.length === 0 || totalQuestions === 0 ? (
+      {subjects.length === 0 || subjects.every((s) => s.lessons.length === 0) ? (
         <div className="flex flex-col items-center justify-center px-5 mt-20 gap-4 text-center">
           <div className="text-5xl">📭</div>
           <p className="text-sm font-semibold text-gray-600">생성된 문제가 없습니다</p>

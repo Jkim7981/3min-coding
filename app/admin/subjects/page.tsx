@@ -29,10 +29,14 @@ export default function AdminSubjectsPage() {
   const [subjects, setSubjects] = useState<SubjectGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState('')
 
   useEffect(() => {
     fetch('/api/admin/students')
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => {
+        if (!r.ok) throw new Error('API 오류')
+        return r.json()
+      })
       .then((data: StudentStat[]) => {
         if (!Array.isArray(data)) return
 
@@ -50,7 +54,7 @@ export default function AdminSubjectsPage() {
         })
         setSubjects(Array.from(map.values()))
       })
-      .catch(() => {})
+      .catch(() => setFetchError('과목 정보를 불러오지 못했습니다. 다시 시도해주세요.'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -69,7 +73,14 @@ export default function AdminSubjectsPage() {
     <div className="flex flex-col min-h-screen px-5 pt-8 pb-24 gap-4">
       <h1 className="text-xl font-bold text-primary-dark">과목 관리</h1>
 
-      {subjects.length === 0 ? (
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+          <span className="text-lg">⚠️</span>
+          <p className="text-sm text-red-600">{fetchError}</p>
+        </div>
+      )}
+
+      {subjects.length === 0 && !fetchError ? (
         <div className="bg-white rounded-2xl p-6 shadow-sm text-center">
           <p className="text-sm text-gray-400">등록된 과목이 없습니다</p>
         </div>
@@ -94,7 +105,7 @@ export default function AdminSubjectsPage() {
               >
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                   <span className="text-sm font-bold text-primary">
-                    {subject.subject_name[0]}
+                    {subject.subject_name?.[0] || '?'}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -121,7 +132,7 @@ export default function AdminSubjectsPage() {
                       className="flex items-center gap-3 px-5 py-3 border-b border-gray-50"
                     >
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
-                        <span className="text-xs font-bold text-gray-500">{s.student_name[0]}</span>
+                        <span className="text-xs font-bold text-gray-500">{s.student_name?.[0] || '?'}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-700">{s.student_name}</p>
@@ -134,8 +145,8 @@ export default function AdminSubjectsPage() {
                     </div>
                   ))}
 
-                  {/* 자료 업로드 버튼 */}
-                  <div className="p-4">
+                  {/* 버튼 영역 */}
+                  <div className="p-4 flex flex-col gap-2">
                     <Link
                       href={`/admin/upload?subjectId=${subject.subject_id}`}
                       className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary text-white text-sm font-bold"
@@ -145,6 +156,16 @@ export default function AdminSubjectsPage() {
                         <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
                       수업 자료 업로드
+                    </Link>
+                    <Link
+                      href={`/admin/questions?subjectId=${subject.subject_id}`}
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-white border border-primary text-primary text-sm font-bold"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="2" y="2" width="12" height="12" rx="2" stroke="#185FA5" strokeWidth="1.5" />
+                        <path d="M4 6h8M4 9h8M4 12h5" stroke="#185FA5" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                      문제 관리
                     </Link>
                   </div>
                 </div>

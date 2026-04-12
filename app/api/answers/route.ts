@@ -3,6 +3,99 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { calculateSM2, getQualityScore } from '@/lib/sm2'
 import { requireAuth } from '@/lib/auth'
 import { normalizeAnswer } from '@/lib/normalize'
+import openai from '@/lib/openai'
+
+// GET /api/answers?question_id=XXX — 학생 본인의 이전 답안 조회 (bug1: 복습 모드용)
+export async function GET(req: NextRequest) {
+  try {
+    const { user, response } = await requireAuth()
+    if (response) return response
+
+    const { searchParams } = new URL(req.url)
+    const question_id = searchParams.get('question_id')
+
+    if (!question_id) {
+      return NextResponse.json({ error: 'question_id가 필요합니다' }, { status: 400 })
+    }
+
+    const { data: answers, error } = await supabaseAdmin
+      .from('user_answers')
+      .select('attempt, is_correct, answer')
+      .eq('student_id', user.id)
+      .eq('question_id', question_id)
+      .order('attempt', { ascending: true })
+
+    if (error) throw error
+
+    if (!answers || answers.length === 0) {
+      return NextResponse.json({ answered: false })
+    }
+
+    const isCorrect = answers.some((a) => a.is_correct)
+    const totalAttempts = answers.length
+    // 완전히 끝난 상태: 정답 맞았거나 2번 다 틀림
+    const isDone = isCorrect || totalAttempts >= 2
+
+    let correct_answer: string | null = null
+    if (isDone && !isCorrect) {
+      // 2번 다 틀린 경우 → 정답 공개 (이미 기회 소진)
+      const { data: q } = await supabaseAdmin
+        .from('questions')
+        .select('answer')
+        .eq('id', question_id)
+        .single()
+      correct_answer = q?.answer ?? null
+    }
+
+    return NextResponse.json({
+      answered: true,
+      attempts: totalAttempts,
+      is_correct: isCorrect,
+      is_done: isDone,
+      first_attempt_answer: answers[0].answer,
+      student_answer: answers[answers.length - 1].answer,
+      correct_answer,
+    })
+  } catch {
+    return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
+  }
+}
+
+// 의미 비교 — 정규화 후에도 다를 때 OpenAI로 최종 판단
+// 개념 문제: 표현이 달라도 같은 뜻이면 정답
+// 코딩 문제: 다른 문법/방식이라도 같은 동작이면 정답 (format() vs f-string 등)
+async function isSameMeaning(
+  studentAnswer: string,
+  correctAnswer: string,
+  questionType: 'concept' | 'coding' = 'concept'
+): Promise<boolean> {
+  try {
+    const systemPrompt =
+      questionType === 'coding'
+        ? '너는 코딩 교육 채점 도우미야. 학생 코드와 모범 코드가 같은 동작을 하는지 판단해. ' +
+          '문법이나 방식이 달라도(f-string vs format() 등) 결과가 동일하면 true, 다르면 false만 반환해. 다른 말은 하지 마.'
+        : '너는 코딩 교육 채점 도우미야. 학생 답안과 모범 답안이 같은 의미인지 판단해. ' +
+          '표현이 달라도 의미가 같으면 true, 다르면 false만 반환해. 다른 말은 하지 마.'
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: `모범 답안: "${correctAnswer}"\n학생 답안: "${studentAnswer}"`,
+        },
+      ],
+      max_tokens: 5,
+      temperature: 0,
+    })
+    const result = completion.choices[0]?.message?.content?.trim().toLowerCase()
+    return result === 'true'
+  } catch {
+    // OpenAI 오류 시 정규화 결과(오답)를 그대로 사용
+    return false
+  }
+}
 
 // POST /api/answers - 답안 제출
 export async function POST(req: NextRequest) {
@@ -64,8 +157,16 @@ export async function POST(req: NextRequest) {
       ? (lessonsData[0]?.subject_id ?? null)
       : (lessonsData?.subject_id ?? null)
 
-    const is_correct =
+    // 1차: 정규화 비교 (빠름, 무료)
+    let is_correct =
       normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)
+
+    // 2차: 정규화로 오답 처리됐을 때 → OpenAI 의미 비교 (폴백)
+    // 코딩 문제: format() vs f-string 등 표현 방식이 달라도 의미상 동일한 경우 처리
+    // 개념 문제: 표현이 달라도 같은 뜻인 경우 처리
+    if (!is_correct) {
+      is_correct = await isSameMeaning(answer, question.answer, question.type)
+    }
 
     // 답안 저장
     // [C 추가 — B 영역] used_hint 필드 insert에 포함.

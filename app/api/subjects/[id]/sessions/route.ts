@@ -25,7 +25,44 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     if (dbError) throw dbError
 
-    return NextResponse.json(data)
+    // 강사는 완료 여부 불필요 — 그대로 반환
+    if (user.role === 'teacher') {
+      return NextResponse.json(data)
+    }
+
+    // 학생: 회차별 완료 여부(is_completed) 추가
+    // 해당 회차에 속한 문제에 답한 적 있으면 completed
+    const lessonIds = (data ?? []).map((l) => l.id)
+
+    if (lessonIds.length === 0) return NextResponse.json([])
+
+    // 1. 학생이 답한 question_id 목록
+    const { data: answeredData } = await supabaseAdmin
+      .from('user_answers')
+      .select('question_id')
+      .eq('student_id', user.id)
+
+    const answeredQIds = new Set((answeredData ?? []).map((a) => a.question_id))
+
+    // 2. 해당 과목 회차들의 question → lesson_id 매핑
+    const { data: questionLessons } = await supabaseAdmin
+      .from('questions')
+      .select('id, lesson_id')
+      .in('lesson_id', lessonIds)
+
+    // 3. 학생이 하나라도 답한 lesson_id 집합
+    const completedLessonIds = new Set(
+      (questionLessons ?? [])
+        .filter((q) => answeredQIds.has(q.id))
+        .map((q) => q.lesson_id)
+    )
+
+    const lessonsWithStatus = (data ?? []).map((lesson) => ({
+      ...lesson,
+      is_completed: completedLessonIds.has(lesson.id),
+    }))
+
+    return NextResponse.json(lessonsWithStatus)
   } catch {
     return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
   }

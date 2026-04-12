@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const { user, response } = await requireTeacher()
     if (response) return response
 
-    const { subject_id, title, content, session_number } = await req.json()
+    const { subject_id, title, content, session_number, scheduled_date } = await req.json()
 
     if (!subject_id || !title || !content) {
       return NextResponse.json({ error: 'subject_id, title, content는 필수입니다' }, { status: 400 })
@@ -69,7 +69,14 @@ export async function POST(req: NextRequest) {
 
     const { data, error: dbError } = await supabaseAdmin
       .from('lessons')
-      .insert({ subject_id, title, content, session_number })
+      .insert({
+        subject_id,
+        title,
+        content,
+        session_number,
+        // scheduled_date가 없으면 null → 즉시 오픈 (하위 호환)
+        scheduled_date: scheduled_date || null,
+      })
       .select()
       .single()
 

@@ -6,6 +6,14 @@ import Link from 'next/link'
 
 type SessionStatus = 'completed' | 'current' | 'preview' | 'locked'
 
+interface LessonFromAPI {
+  id: string
+  title: string
+  session_number?: number
+  scheduled_date?: string | null
+  is_completed?: boolean
+}
+
 interface Session {
   id: string
   title: string
@@ -106,14 +114,38 @@ export default function SubjectRoadmapPage({ params }: { params: Promise<{ subje
         const lData = await lRes.json()
         if (!Array.isArray(lData)) return
 
-        // 정렬 후 상태 부여 (첫 번째 = current, 나머지 = preview)
-        const sorted = [...lData].sort((a, b) =>
+        // 날짜 기반 상태 부여 (B안: scheduled_date <= 오늘이면 오픈)
+        const sorted = [...lData].sort((a: LessonFromAPI, b: LessonFromAPI) =>
           (a.session_number ?? 0) - (b.session_number ?? 0)
         )
-        const withStatus: Session[] = sorted.map((l, i) => ({
-          ...l,
-          status: i === 0 ? 'current' : i === 1 ? 'preview' : 'locked',
-        }))
+
+        // 오늘 날짜 문자열 (YYYY-MM-DD). sv-SE 로케일이 ISO 형식 반환
+        const todayStr = new Date().toLocaleDateString('sv-SE')
+
+        // 오늘 이후 회차 중 가장 가까운 1개만 preview (나머지는 locked)
+        const nextSessionId = sorted.find(
+          (l: LessonFromAPI) => l.scheduled_date && l.scheduled_date > todayStr
+        )?.id ?? null
+
+        const withStatus: Session[] = sorted.map((l: LessonFromAPI) => {
+          let status: SessionStatus
+
+          if (!l.scheduled_date) {
+            // scheduled_date 없음 → 즉시 오픈 (하위 호환)
+            status = l.is_completed ? 'completed' : 'current'
+          } else if (l.scheduled_date <= todayStr) {
+            // 오늘 이하 → 오픈
+            status = l.is_completed ? 'completed' : 'current'
+          } else if (l.id === nextSessionId) {
+            // 가장 가까운 미래 회차 1개만 → 예습 (문제 풀기 가능)
+            status = 'preview'
+          } else {
+            // 그 이후 → 잠금
+            status = 'locked'
+          }
+
+          return { ...l, status }
+        })
         setSessions(withStatus)
       } catch (err) {
         setError(err instanceof Error ? err.message : '불러오기에 실패했습니다')
