@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Question {
   id: string
@@ -41,6 +41,8 @@ const typeLabel: Record<string, { label: string; color: string }> = {
 
 export default function AdminQuestionsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const filterSubjectId = searchParams.get('subjectId')
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [loading, setLoading] = useState(true)
   // [B 수정] API 실패 시 에러 상태를 별도로 관리하도록 추가.
@@ -77,7 +79,10 @@ export default function AdminQuestionsPage() {
           })
         )
 
-        setSubjects(subjectsWithLessons)
+        const filtered = filterSubjectId
+          ? subjectsWithLessons.filter((s) => s.id === filterSubjectId)
+          : subjectsWithLessons
+        setSubjects(filtered)
       } finally {
         setLoading(false)
       }
@@ -165,9 +170,22 @@ export default function AdminQuestionsPage() {
     <div className="min-h-screen bg-primary-light">
       {/* 헤더 */}
       <div className="flex items-center justify-between px-5 pt-8 pb-4">
-        <div>
-          <p className="text-xs text-gray-400 font-medium">강사 관리</p>
-          <h1 className="text-lg font-bold text-primary-dark">생성된 문제</h1>
+        <div className="flex items-center gap-2">
+          {filterSubjectId && (
+            <button
+              onClick={() => router.back()}
+              className="p-1.5 rounded-full hover:bg-white/60 transition-colors"
+              aria-label="뒤로가기"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <path d="M13 4l-6 6 6 6" stroke="#185FA5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          )}
+          <div>
+            <p className="text-xs text-gray-400 font-medium">강사 관리</p>
+            <h1 className="text-lg font-bold text-primary-dark">생성된 문제</h1>
+          </div>
         </div>
         <div className="bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-full">
           {totalQuestions > 0 ? `총 ${totalQuestions}문제` : '문제 탭하여 확인'}

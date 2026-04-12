@@ -134,8 +134,8 @@ export default function AdminSubjectsPage() {
                     </div>
                   ))}
 
-                  {/* 자료 업로드 버튼 */}
-                  <div className="p-4">
+                  {/* 버튼 영역 */}
+                  <div className="p-4 flex flex-col gap-2">
                     <Link
                       href={`/admin/upload?subjectId=${subject.subject_id}`}
                       className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-primary text-white text-sm font-bold"
@@ -145,6 +145,16 @@ export default function AdminSubjectsPage() {
                         <path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
                       수업 자료 업로드
+                    </Link>
+                    <Link
+                      href={`/admin/questions?subjectId=${subject.subject_id}`}
+                      className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-white border border-primary text-primary text-sm font-bold"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="2" y="2" width="12" height="12" rx="2" stroke="#185FA5" strokeWidth="1.5" />
+                        <path d="M4 6h8M4 9h8M4 12h5" stroke="#185FA5" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                      문제 관리
                     </Link>
                   </div>
                 </div>
