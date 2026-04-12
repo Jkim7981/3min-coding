@@ -11,15 +11,22 @@ export default function AdminSettingsPage() {
   const router = useRouter()
 
   const handleSignOut = async () => {
-    await signOut({ redirect: false })
-    router.push('/login')
+    try {
+      await signOut({ redirect: false })
+      router.push('/login')
+    } catch {
+      alert('로그아웃 중 오류가 발생했습니다. 다시 시도해주세요.')
+    }
   }
 
   return (
     <div className="flex flex-col min-h-screen px-5 pt-8 pb-24">
       <h1 className="text-xl font-bold text-primary-dark mb-5">설정</h1>
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <button className="w-full flex items-center justify-between px-5 py-4 border-b border-gray-50 text-sm text-gray-700 hover:bg-gray-50">
+        <button
+          onClick={() => alert('알림 설정 기능은 준비 중입니다.')}
+          className="w-full flex items-center justify-between px-5 py-4 border-b border-gray-50 text-sm text-gray-700 hover:bg-gray-50"
+        >
           알림 설정
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" /></svg>
         </button>

@@ -42,7 +42,8 @@ export default function ReportPage() {
       }
       const data = await res.json()
       if (data && data.summary) {
-        setReport({ analysis: JSON.parse(data.summary) })
+        const parsed = typeof data.summary === 'string' ? JSON.parse(data.summary) : data.summary
+        setReport({ analysis: parsed })
       } else {
         setNoData(true)
       }
