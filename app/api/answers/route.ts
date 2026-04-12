@@ -5,6 +5,62 @@ import { requireAuth } from '@/lib/auth'
 import { normalizeAnswer } from '@/lib/normalize'
 import openai from '@/lib/openai'
 
+// GET /api/answers?question_id=XXX — 학생 본인의 이전 답안 조회 (bug1: 복습 모드용)
+export async function GET(req: NextRequest) {
+  try {
+    const { user, response } = await requireAuth()
+    if (response) return response
+
+    const { searchParams } = new URL(req.url)
+    const question_id = searchParams.get('question_id')
+
+    if (!question_id) {
+      return NextResponse.json({ error: 'question_id가 필요합니다' }, { status: 400 })
+    }
+
+    const { data: answers, error } = await supabaseAdmin
+      .from('user_answers')
+      .select('attempt, is_correct, answer')
+      .eq('student_id', user.id)
+      .eq('question_id', question_id)
+      .order('attempt', { ascending: true })
+
+    if (error) throw error
+
+    if (!answers || answers.length === 0) {
+      return NextResponse.json({ answered: false })
+    }
+
+    const isCorrect = answers.some((a) => a.is_correct)
+    const totalAttempts = answers.length
+    // 완전히 끝난 상태: 정답 맞았거나 2번 다 틀림
+    const isDone = isCorrect || totalAttempts >= 2
+
+    let correct_answer: string | null = null
+    if (isDone && !isCorrect) {
+      // 2번 다 틀린 경우 → 정답 공개 (이미 기회 소진)
+      const { data: q } = await supabaseAdmin
+        .from('questions')
+        .select('answer')
+        .eq('id', question_id)
+        .single()
+      correct_answer = q?.answer ?? null
+    }
+
+    return NextResponse.json({
+      answered: true,
+      attempts: totalAttempts,
+      is_correct: isCorrect,
+      is_done: isDone,
+      first_attempt_answer: answers[0].answer,
+      student_answer: answers[answers.length - 1].answer,
+      correct_answer,
+    })
+  } catch {
+    return NextResponse.json({ error: '서버 오류가 발생했습니다' }, { status: 500 })
+  }
+}
+
 // 개념 문제 의미 비교 — 정규화 후에도 다를 때 OpenAI로 최종 판단
 async function isSameMeaning(studentAnswer: string, correctAnswer: string): Promise<boolean> {
   try {

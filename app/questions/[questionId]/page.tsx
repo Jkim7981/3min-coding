@@ -36,7 +36,14 @@ interface ExecResult {
   all_passed?: boolean
 }
 
-type Phase = 'answering' | 'first_wrong'
+type Phase = 'answering' | 'first_wrong' | 'review'
+
+interface PreviousResult {
+  is_correct: boolean
+  student_answer: string
+  first_attempt_answer: string
+  correct_answer: string | null
+}
 
 // [B 수정] 언어 감지 로직 개선.
 // 기존: concept_tags의 영어 키워드만 체크했는데, AI가 태그를 한국어("자바", "파이썬")로
@@ -87,6 +94,9 @@ export default function QuestionPage({
   const [firstAttemptAnswer, setFirstAttemptAnswer] = useState('')
   // 이탈 확인 (그만하기 / 뒤로가기)
   const [showExitConfirm, setShowExitConfirm] = useState(false)
+  // [Bug1] 이미 풀었던 문제 복습 모드
+  const [checkingPrevious, setCheckingPrevious] = useState(false)
+  const [previousResult, setPreviousResult] = useState<PreviousResult | null>(null)
 
   useEffect(() => {
     if (!sessionId) return
@@ -106,6 +116,8 @@ export default function QuestionPage({
   const prevQuestion = questions[currentIndex - 1]
 
   useEffect(() => {
+    if (!question) return
+
     // 문제 변경 시 모든 입력 상태 초기화 (이전/다음 이동 시 오염 방지)
     setAnswer('')
     setPhase('answering')
@@ -114,11 +126,39 @@ export default function QuestionPage({
     setFirstAttemptAnswer('')
     setError('')
     setExecResult(null)
+    setPreviousResult(null)
 
-    if (question?.type === 'coding' && question.code_template) {
+    if (question.type === 'coding' && question.code_template) {
       const count = (question.code_template.match(/___/g) || []).length
       setBlankAnswers(Array(count).fill(''))
     }
+
+    // [Bug1] 이미 답한 문제인지 확인 → 복습 or first_wrong 복원
+    setCheckingPrevious(true)
+    fetch(`/api/answers?question_id=${question.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.answered) return
+
+        if (data.is_done) {
+          // 완전히 끝난 문제 → 복습 모드
+          setPreviousResult({
+            is_correct: data.is_correct,
+            student_answer: data.student_answer,
+            first_attempt_answer: data.first_attempt_answer,
+            correct_answer: data.correct_answer,
+          })
+          setPhase('review')
+        } else {
+          // 1차 오답만 있는 상태 → first_wrong 복원 (2차 시도 허용)
+          setFirstAttemptAnswer(data.first_attempt_answer)
+          setPhase('first_wrong')
+        }
+      })
+      .catch(() => {
+        // 조회 실패 시 answering 상태 유지 (graceful fallback)
+      })
+      .finally(() => setCheckingPrevious(false))
   }, [question])
 
   const codingParts = question?.code_template?.split('___') ?? []
@@ -244,7 +284,8 @@ export default function QuestionPage({
 
   const difficultyColor = { easy: 'text-green-600', medium: 'text-yellow-600', hard: 'text-red-600' }
   const difficultyLabel = { easy: '쉬움', medium: '보통', hard: '어려움' }
-  const isAnswerable = phase === 'answering' || phase === 'first_wrong'
+  // review 모드이거나 이전 답안 체크 중이면 입력 불가
+  const isAnswerable = (phase === 'answering' || phase === 'first_wrong') && !checkingPrevious
   // 코딩 문제는 모든 빈칸을 채워야 제출 가능
   const hasAnswer = question.type === 'coding'
     ? blankAnswers.every((a) => a.trim())
@@ -543,6 +584,72 @@ export default function QuestionPage({
                   {submitting ? '제출 중...' : phase === 'first_wrong' ? '다시 제출하기' : '제출하기'}
                 </button>
               </div>
+            )}
+          </>
+        )}
+
+        {/* ── [Bug1] 이전 답안 체크 중 로딩 ── */}
+        {checkingPrevious && (
+          <div className="flex items-center justify-center gap-2 py-4 text-gray-400 text-sm">
+            <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
+            이전 기록 확인 중...
+          </div>
+        )}
+
+        {/* ── [Bug1] 복습 모드 UI ── */}
+        {phase === 'review' && previousResult && !checkingPrevious && (
+          <>
+            <div className={`rounded-2xl p-5 shadow-sm border ${previousResult.is_correct ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${previousResult.is_correct ? 'bg-green-500' : 'bg-red-500'}`}>
+                  {previousResult.is_correct ? (
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M2.5 7.5l3.5 3.5 5.5-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <path d="M2 2l8 8M10 2L2 10" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                  )}
+                </div>
+                <p className={`font-bold text-sm ${previousResult.is_correct ? 'text-green-700' : 'text-red-600'}`}>
+                  {previousResult.is_correct ? '정답을 맞혔어요!' : '아쉽게 틀렸어요'}
+                </p>
+                <span className="ml-auto text-xs text-gray-400 font-medium">풀었던 문제</span>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 mb-0.5">내 답변</p>
+                  <p className="text-sm text-gray-700 font-medium">{previousResult.student_answer}</p>
+                </div>
+                {!previousResult.is_correct && previousResult.correct_answer && (
+                  <div className="pt-2 border-t border-red-200">
+                    <p className="text-xs font-semibold text-gray-400 mb-0.5">정답</p>
+                    <p className="text-sm font-bold text-gray-800">{previousResult.correct_answer}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 해설 보기 버튼 (오답일 때만) */}
+            {!previousResult.is_correct && (
+              <button
+                onClick={() => {
+                  const p = new URLSearchParams({
+                    is_correct: 'false',
+                    correct_answer: previousResult.correct_answer ?? '',
+                    student_answer: previousResult.student_answer,
+                    sessionId,
+                    subjectId,
+                    ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
+                  })
+                  router.push(`/questions/${question.id}/result?${p}`)
+                }}
+                className="w-full py-3 rounded-xl bg-primary-light text-primary font-bold text-sm border border-primary/20 hover:bg-blue-50 transition-colors"
+              >
+                🤖 AI 해설 보기
+              </button>
             )}
           </>
         )}
