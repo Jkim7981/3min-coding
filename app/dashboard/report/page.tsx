@@ -35,9 +35,8 @@ export default function ReportPage() {
     setFetchError('')
     try {
       const res = await fetch(`/api/reports?period=${p}`)
-      // [C 추가] 서버 에러(4xx/5xx) 처리
       if (!res.ok) {
-        setFetchError('리포트를 불러오는 중 오류가 발생했습니다.')
+        setFetchError('ai')
         return
       }
       const data = await res.json()
@@ -48,8 +47,7 @@ export default function ReportPage() {
         setNoData(true)
       }
     } catch {
-      // [C 추가] 네트워크 오류 처리
-      setFetchError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
+      setFetchError('network')
     } finally {
       setLoading(false)
     }
@@ -68,7 +66,7 @@ export default function ReportPage() {
       })
       // [C 추가] 서버 에러 처리
       if (!res.ok) {
-        setFetchError('리포트 생성 중 오류가 발생했습니다. 다시 시도해주세요.')
+        setFetchError('ai')
         return
       }
       const data = await res.json()
@@ -78,8 +76,7 @@ export default function ReportPage() {
         setReport({ analysis: data.analysis, wrong_count: data.wrong_count, cached: data.cached })
       }
     } catch {
-      // [C 추가] 네트워크 오류 처리
-      setFetchError('네트워크 오류가 발생했습니다. 다시 시도해주세요.')
+      setFetchError('network')
     } finally {
       setGenerating(false)
     }
@@ -117,11 +114,31 @@ export default function ReportPage() {
         </div>
       )}
 
-      {/* [C 추가] API 에러 메시지 */}
-      {fetchError && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 flex items-center gap-3">
-          <span className="text-lg">⚠️</span>
-          <p className="text-sm text-red-600">{fetchError}</p>
+      {/* [C 수정] 에러 상황별 친근한 안내 메시지 */}
+      {fetchError === 'ai' && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm text-center flex flex-col items-center gap-3">
+          <span className="text-4xl">😴</span>
+          <p className="font-bold text-gray-700">AI가 잠시 쉬고 있어요</p>
+          <p className="text-sm text-gray-400">조금 후에 다시 시도해주세요</p>
+          <button
+            onClick={() => fetchReport(period)}
+            className="mt-1 px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
+      {fetchError === 'network' && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm text-center flex flex-col items-center gap-3">
+          <span className="text-4xl">📡</span>
+          <p className="font-bold text-gray-700">인터넷 연결을 확인해주세요</p>
+          <p className="text-sm text-gray-400">연결 후 다시 시도해주세요</p>
+          <button
+            onClick={() => fetchReport(period)}
+            className="mt-1 px-5 py-2 rounded-xl bg-primary text-white text-sm font-bold"
+          >
+            다시 시도
+          </button>
         </div>
       )}
 
