@@ -46,18 +46,16 @@ const tabs = [
       </svg>
     ),
   },
+  // [C 수정 — A 영역] "문제 관리" 탭 → "설정" 탭으로 교체.
+  // 문제 관리는 과목 탭 내부에서 접근 가능하므로 하단 바에서 제거.
   {
-    href: '/admin/questions',
-    label: '문제 관리',
+    href: '/admin/settings',
+    label: '설정',
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-        <rect
-          x="3" y="3" width="16" height="16" rx="3"
-          stroke={active ? '#185FA5' : '#9CA3AF'}
-          strokeWidth="1.8"
-        />
+        <circle cx="11" cy="11" r="3" stroke={active ? '#185FA5' : '#9CA3AF'} strokeWidth="1.8" />
         <path
-          d="M7 8h8M7 11h8M7 14h5"
+          d="M11 2v2M11 18v2M2 11h2M18 11h2M4.22 4.22l1.42 1.42M16.36 16.36l1.42 1.42M4.22 17.78l1.42-1.42M16.36 5.64l1.42-1.42"
           stroke={active ? '#185FA5' : '#9CA3AF'}
           strokeWidth="1.8"
           strokeLinecap="round"
