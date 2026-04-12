@@ -3,6 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase'
 import openai from '@/lib/openai'
 import { requireAuth } from '@/lib/auth'
 
+// 저장된 해설이 충분한지 판단 (30자 이상이면 충분하다고 봄)
+const MIN_EXPLANATION_LENGTH = 30
+
 // POST /api/explanation - 2차 오답 시 자동 해설 생성
 export async function POST(req: NextRequest) {
   try {
@@ -15,10 +18,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'question_id와 student_answer는 필수입니다' }, { status: 400 })
     }
 
-    // 서버에서 직접 문제/정답 조회 (클라이언트 값 신뢰 X → OpenAI 비용 오남용 방지)
+    // explanation 포함해서 조회
     const { data: question, error: qError } = await supabaseAdmin
       .from('questions')
-      .select('question, answer')
+      .select('question, answer, explanation')
       .eq('id', question_id)
       .single()
 
@@ -26,6 +29,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '문제를 찾을 수 없습니다' }, { status: 404 })
     }
 
+    // 저장된 해설이 충분하면 AI 호출 없이 바로 반환
+    if (question.explanation && question.explanation.length >= MIN_EXPLANATION_LENGTH) {
+      return NextResponse.json({ source: 'stored', explanation: question.explanation })
+    }
+
+    // 해설이 없거나 너무 짧으면 AI로 보강
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -42,9 +51,13 @@ export async function POST(req: NextRequest) {
       max_tokens: 500,
     })
 
-    const explanation = completion.choices[0]?.message?.content ?? '해설을 생성하지 못했습니다. 다시 시도해주세요.'
+    const enhanced =
+      completion.choices[0]?.message?.content ?? '해설을 생성하지 못했습니다. 다시 시도해주세요.'
 
-    return NextResponse.json({ explanation })
+    // 다음 번엔 재사용하도록 DB에 저장 (캐시)
+    await supabaseAdmin.from('questions').update({ explanation: enhanced }).eq('id', question_id)
+
+    return NextResponse.json({ source: 'enhanced', explanation: enhanced })
   } catch (err) {
     console.error(err)
     return NextResponse.json({ error: '해설 생성 중 오류가 발생했습니다' }, { status: 500 })

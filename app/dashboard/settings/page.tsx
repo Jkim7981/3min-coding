@@ -2,6 +2,7 @@
 
 import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Button from '@/components/ui/Button'
 
 export default function SettingsPage() {
@@ -20,10 +21,10 @@ export default function SettingsPage() {
           알림 설정
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" /></svg>
         </button>
-        <button className="w-full flex items-center justify-between px-5 py-4 border-b border-gray-50 text-sm text-gray-700 hover:bg-gray-50">
+        <Link href="/privacy" className="w-full flex items-center justify-between px-5 py-4 border-b border-gray-50 text-sm text-gray-700 hover:bg-gray-50">
           개인정보 처리방침
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" /></svg>
-        </button>
+        </Link>
         <button className="w-full flex items-center justify-between px-5 py-4 text-sm text-gray-700 hover:bg-gray-50">
           버전 정보 v0.1.0
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" /></svg>
