@@ -1,11 +1,17 @@
 import openai from '@/lib/openai'
 
+export interface TestCase {
+  input: unknown[]
+  expected: unknown
+}
+
 export interface Question {
   type: 'concept' | 'coding'
   difficulty: 'easy' | 'medium' | 'hard'
   question: string
   code_template?: string | null
   expected_output?: string | null
+  test_cases?: TestCase[] | null
   answer: string
   hint: string
   explanation: string
