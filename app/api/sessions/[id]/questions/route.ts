@@ -28,9 +28,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return NextResponse.json({ error: '접근 권한이 없습니다' }, { status: 403 })
     }
 
+    // 강사는 answer 포함, 학생은 answer 제외 (정답 노출 방지)
+    const fields =
+      user.role === 'teacher'
+        ? 'id, type, difficulty, question, answer, code_template, expected_output, test_cases, hint, concept_tags, created_at'
+        : 'id, type, difficulty, question, code_template, expected_output, test_cases, hint, concept_tags, created_at'
+
     const { data, error: dbError } = await supabaseAdmin
       .from('questions')
-      .select('id, type, difficulty, question, code_template, expected_output, test_cases, hint, concept_tags, created_at')
+      .select(fields)
       .eq('lesson_id', lessonId)
       .order('created_at', { ascending: true })
 

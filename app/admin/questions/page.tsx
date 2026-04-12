@@ -174,7 +174,7 @@ export default function AdminQuestionsPage() {
         </div>
       </div>
 
-      {subjects.length === 0 || totalQuestions === 0 ? (
+      {subjects.length === 0 ? (
         <div className="flex flex-col items-center justify-center px-5 mt-20 gap-4 text-center">
           <div className="text-5xl">📭</div>
           <p className="text-sm font-semibold text-gray-600">생성된 문제가 없습니다</p>
