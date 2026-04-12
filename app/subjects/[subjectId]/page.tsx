@@ -121,9 +121,11 @@ export default function SubjectRoadmapPage({ params }: { params: Promise<{ subje
 
         // 오늘 날짜 문자열 (YYYY-MM-DD). sv-SE 로케일이 ISO 형식 반환
         const todayStr = new Date().toLocaleDateString('sv-SE')
-        const tomorrow = new Date()
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        const tomorrowStr = tomorrow.toLocaleDateString('sv-SE')
+
+        // 오늘 이후 회차 중 가장 가까운 1개만 preview (나머지는 locked)
+        const nextSessionId = sorted.find(
+          (l: LessonFromAPI) => l.scheduled_date && l.scheduled_date > todayStr
+        )?.id ?? null
 
         const withStatus: Session[] = sorted.map((l: LessonFromAPI) => {
           let status: SessionStatus
@@ -134,8 +136,8 @@ export default function SubjectRoadmapPage({ params }: { params: Promise<{ subje
           } else if (l.scheduled_date <= todayStr) {
             // 오늘 이하 → 오픈
             status = l.is_completed ? 'completed' : 'current'
-          } else if (l.scheduled_date === tomorrowStr) {
-            // 내일 수업 → 예습 (볼 수는 있지만 풀지 못함)
+          } else if (l.id === nextSessionId) {
+            // 가장 가까운 미래 회차 1개만 → 예습 (문제 풀기 가능)
             status = 'preview'
           } else {
             // 그 이후 → 잠금
