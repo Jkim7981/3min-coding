@@ -6,6 +6,7 @@ export interface TestCase {
 }
 
 export interface Question {
+
   type: 'concept' | 'coding'
   difficulty: 'easy' | 'medium' | 'hard'
   question: string

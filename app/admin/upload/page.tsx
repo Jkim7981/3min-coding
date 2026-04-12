@@ -387,7 +387,7 @@ export default function UploadPage() {
           ) : allSessionsDone ? (
             '모든 회차 업로드 완료'
           ) : (
-            `${sessionNumber}회차 수업 자료 업로드`
+            sessionNumber ? `${sessionNumber}회차 수업 자료 업로드` : '수업 자료 업로드'
           )}
         </button>
       </form>

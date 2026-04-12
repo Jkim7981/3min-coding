@@ -209,8 +209,7 @@ export default function ReportPage() {
           {/* [C 추가] wrong_count 표시 — 분석 기반 오답 수 안내 */}
           {report.wrong_count !== undefined && report.wrong_count > 0 && (
             <p className="text-center text-xs text-gray-400">
-              {period === 'weekly' ? '최근 7일' : '최근 30일'} 오답{' '}
-              <span className="font-bold text-gray-600">{report.wrong_count}개</span> 기반 분석
+              {period === 'weekly' ? '최근 7일' : '최근 30일'} 오답 <span className="font-bold text-gray-600">{report.wrong_count}개</span> 기반 분석
             </p>
           )}
 
