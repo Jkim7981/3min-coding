@@ -3,6 +3,35 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { calculateSM2, getQualityScore } from '@/lib/sm2'
 import { requireAuth } from '@/lib/auth'
 import { normalizeAnswer } from '@/lib/normalize'
+import openai from '@/lib/openai'
+
+// 개념 문제 의미 비교 — 정규화 후에도 다를 때 OpenAI로 최종 판단
+async function isSameMeaning(studentAnswer: string, correctAnswer: string): Promise<boolean> {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            '너는 코딩 교육 채점 도우미야. 학생 답안과 모범 답안이 같은 의미인지 판단해. ' +
+            '표현이 달라도 의미가 같으면 true, 다르면 false만 반환해. 다른 말은 하지 마.',
+        },
+        {
+          role: 'user',
+          content: `모범 답안: "${correctAnswer}"\n학생 답안: "${studentAnswer}"`,
+        },
+      ],
+      max_tokens: 5,
+      temperature: 0,
+    })
+    const result = completion.choices[0]?.message?.content?.trim().toLowerCase()
+    return result === 'true'
+  } catch {
+    // OpenAI 오류 시 정규화 결과(오답)를 그대로 사용
+    return false
+  }
+}
 
 // POST /api/answers - 답안 제출
 export async function POST(req: NextRequest) {
@@ -64,8 +93,14 @@ export async function POST(req: NextRequest) {
       ? (lessonsData[0]?.subject_id ?? null)
       : (lessonsData?.subject_id ?? null)
 
-    const is_correct =
+    // 1차: 정규화 비교 (빠름, 무료)
+    let is_correct =
       normalizeAnswer(answer, question.type) === normalizeAnswer(question.answer, question.type)
+
+    // 2차: 개념 문제이고 정규화로 오답 처리됐을 때 → OpenAI 의미 비교 (폴백)
+    if (!is_correct && question.type === 'concept') {
+      is_correct = await isSameMeaning(answer, question.answer)
+    }
 
     // 답안 저장
     // [C 추가 — B 영역] used_hint 필드 insert에 포함.
