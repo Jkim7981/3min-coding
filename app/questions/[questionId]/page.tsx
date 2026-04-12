@@ -85,6 +85,8 @@ export default function QuestionPage({
   const [hintUsed, setHintUsed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [firstAttemptAnswer, setFirstAttemptAnswer] = useState('')
+  // 이탈 확인 (그만하기 / 뒤로가기)
+  const [showExitConfirm, setShowExitConfirm] = useState(false)
 
   useEffect(() => {
     if (!sessionId) return
@@ -256,7 +258,18 @@ export default function QuestionPage({
   return (
     <div className="min-h-screen bg-primary-light flex flex-col">
       <div className="flex items-center justify-between px-5 pt-8 pb-3">
-        <button onClick={() => router.back()} className="p-1.5 rounded-full hover:bg-white/60 transition-colors">
+        <button
+          onClick={() => {
+            // 풀이 중(1차 오답 단계)이면 확인 팝업
+            if (phase === 'first_wrong') {
+              setShowExitConfirm(true)
+            } else {
+              router.back()
+            }
+          }}
+          className="p-1.5 rounded-full hover:bg-white/60 transition-colors"
+          aria-label="뒤로가기"
+        >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <path d="M13 4l-6 6 6 6" stroke="#185FA5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -467,13 +480,18 @@ export default function QuestionPage({
             <button
               // [C 추가 — A 영역] 힌트 열릴 때 hintUsed를 true로 설정
               onClick={() => { setShowHint((v) => !v); setHintUsed(true) }}
-              className="text-sm text-primary font-semibold flex items-center gap-1.5"
+              className={[
+                'text-sm font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all',
+                showHint
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-white text-primary border border-primary/30 hover:bg-primary/5',
+              ].join(' ')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="7" stroke="#185FA5" strokeWidth="1.5" />
-                <path d="M8 5v1M8 8v3" stroke="#185FA5" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M8 5v1M8 8v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
               </svg>
-              {showHint ? '힌트 숨기기' : '힌트 보기'}
+              {showHint ? '✓ 힌트 확인 중' : '힌트 보기'}
             </button>
             {showHint && (
               <div className="mt-2 bg-blue-50 border border-blue-100 rounded-xl p-3 text-sm text-blue-700">
@@ -484,23 +502,49 @@ export default function QuestionPage({
         )}
 
         {isAnswerable && (
-          <div className="flex gap-2">
-            {phase === 'first_wrong' && (
-              <button
-                onClick={() => router.back()}
-                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 text-sm font-semibold bg-white"
-              >
-                그만하기
-              </button>
+          <>
+            {/* 이탈 확인 배너 */}
+            {showExitConfirm && (
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+                <p className="text-orange-700 font-semibold text-sm mb-3">🚪 정말 나갈까요?</p>
+                <p className="text-orange-500 text-xs mb-3">지금 나가면 이번 시도는 기록되지 않아요.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => router.back()}
+                    className="flex-1 py-2.5 rounded-xl bg-orange-400 text-white text-sm font-bold"
+                  >
+                    나갈게요
+                  </button>
+                  <button
+                    onClick={() => setShowExitConfirm(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-orange-200 text-orange-600 text-sm font-semibold bg-white"
+                  >
+                    계속 풀게요
+                  </button>
+                </div>
+              </div>
             )}
-            <button
-              onClick={handleSubmit}
-              disabled={!hasAnswer || submitting}
-              className="flex-1 py-3 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50"
-            >
-              {submitting ? '제출 중...' : phase === 'first_wrong' ? '다시 제출하기' : '제출하기'}
-            </button>
-          </div>
+
+            {!showExitConfirm && (
+              <div className="flex gap-2">
+                {phase === 'first_wrong' && (
+                  <button
+                    onClick={() => setShowExitConfirm(true)}
+                    className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-500 text-sm font-semibold bg-white"
+                  >
+                    그만하기
+                  </button>
+                )}
+                <button
+                  onClick={handleSubmit}
+                  disabled={!hasAnswer || submitting}
+                  className="flex-1 py-3 rounded-xl bg-primary text-white text-sm font-bold disabled:opacity-50"
+                >
+                  {submitting ? '제출 중...' : phase === 'first_wrong' ? '다시 제출하기' : '제출하기'}
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {/* ── 이전 / 다음 네비게이션 [B 추가] ── */}

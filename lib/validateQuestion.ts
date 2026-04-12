@@ -85,16 +85,8 @@ ${question.code_template ? `코드 템플릿:\n${question.code_template}` : ''}
   }
 }
 
-// 여러 문제 배치 검증 — 순차 처리로 OpenAI rate limit 방지
+// 여러 문제 배치 검증 — 병렬 처리로 속도 개선 (gpt-4o-mini rate limit은 충분)
 export async function validateQuestions(questions: Question[]): Promise<Question[]> {
-  const validQuestions: Question[] = []
-
-  for (const q of questions) {
-    const validation = await validateQuestion(q)
-    if (validation.valid) {
-      validQuestions.push(q)
-    }
-  }
-
-  return validQuestions
+  const results = await Promise.all(questions.map((q) => validateQuestion(q)))
+  return questions.filter((_, i) => results[i].valid)
 }

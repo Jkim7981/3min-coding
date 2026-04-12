@@ -25,25 +25,31 @@ export default function DashboardPage() {
 
   const [subjects, setSubjects] = useState<Subject[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
-  const [loadingSubjects, setLoadingSubjects] = useState(true)
-  const [loadingStats, setLoadingStats] = useState(true)
+  // 두 API를 병렬로 fetching — 단일 loading 상태로 관리해 불필요한 리렌더링 방지
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // [B 수정] res.ok 체크 추가.
-    // 기존: 두 API 모두 에러 응답이 와도 .json()을 그냥 파싱해서
-    // subjects는 조용히 빈 배열 유지, stats는 data.error 구조가 달라 setStats(undefined)가 될 수 있음.
-    // 수정: ok 아닐 때 catch로 넘겨 빈 상태 유지.
-    fetch('/api/subjects')
-      .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
-      .then((data) => { if (Array.isArray(data)) setSubjects(data) })
-      .catch(() => {})
-      .finally(() => setLoadingSubjects(false))
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000) // 10초 타임아웃
 
-    fetch('/api/stats')
-      .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
-      .then((data) => setStats(data))
-      .catch(() => {})
-      .finally(() => setLoadingStats(false))
+    Promise.all([
+      fetch('/api/subjects', { signal: controller.signal })
+        .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
+        .then((data) => { if (Array.isArray(data)) setSubjects(data) })
+        .catch(() => {}),
+      fetch('/api/stats', { signal: controller.signal })
+        .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
+        .then((data) => setStats(data))
+        .catch(() => {}),
+    ]).finally(() => {
+      clearTimeout(timeout)
+      setLoading(false)
+    })
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
   }, [])
 
   return (
@@ -70,7 +76,7 @@ export default function DashboardPage() {
       {/* 수강 과목 카드 */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-gray-500">내 과목</h2>
-        {loadingSubjects ? (
+        {loading ? (
           <>
             <SubjectCardSkeleton />
             <SubjectCardSkeleton />
@@ -106,7 +112,7 @@ export default function DashboardPage() {
 
       {/* 학습 현황 */}
       <section className="grid grid-cols-2 gap-3">
-        {loadingStats ? (
+        {loading ? (
           <>
             <StatCardSkeleton />
             <StatCardSkeleton />
