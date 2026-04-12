@@ -54,7 +54,7 @@ export default function AdminQuestionsPage() {
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null)
 
-  // 초기 로드: 과목 + 회차만 (문제는 lazy)
+  // 초기 로드: 과목 + 회차 + 문제 수 (처음부터 문제 수 표시)
   useEffect(() => {
     async function loadAll() {
       try {
@@ -69,12 +69,18 @@ export default function AdminQuestionsPage() {
           sData.map(async (subject: { id: string; name: string }) => {
             const lRes = await fetch(`/api/subjects/${subject.id}/sessions`)
             const lData = await lRes.json()
-            const lessons: Lesson[] = Array.isArray(lData)
-              ? lData.map((l: { id: string; title: string; session_number?: number }) => ({
-                  ...l,
-                  questions: null, // 회차 열 때 lazy 로드
-                }))
-              : []
+            const lessons: Lesson[] = await Promise.all(
+              (Array.isArray(lData) ? lData : []).map(
+                async (l: { id: string; title: string; session_number?: number }) => {
+                  const qRes = await fetch(`/api/sessions/${l.id}/questions`)
+                  const qData = await qRes.json()
+                  return {
+                    ...l,
+                    questions: Array.isArray(qData) ? qData : [],
+                  }
+                }
+              )
+            )
             return { ...subject, lessons }
           })
         )
@@ -90,50 +96,6 @@ export default function AdminQuestionsPage() {
     loadAll()
   }, [retryKey])
 
-  // 회차 펼칠 때 문제 lazy 로드
-  useEffect(() => {
-    if (!expandedLesson) return
-
-    // 이미 로드됐으면 스킵
-    const lesson = subjects.flatMap((s) => s.lessons).find((l) => l.id === expandedLesson)
-    if (!lesson || lesson.questions !== null) return
-
-    // 로딩 상태 표시
-    setSubjects((prev) =>
-      prev.map((s) => ({
-        ...s,
-        lessons: s.lessons.map((l) =>
-          l.id === expandedLesson ? { ...l, loadingQuestions: true } : l
-        ),
-      }))
-    )
-
-    fetch(`/api/sessions/${expandedLesson}/questions`)
-      .then((r) => r.json())
-      .then((data) => {
-        setSubjects((prev) =>
-          prev.map((s) => ({
-            ...s,
-            lessons: s.lessons.map((l) =>
-              l.id === expandedLesson
-                ? { ...l, questions: Array.isArray(data) ? data : [], loadingQuestions: false }
-                : l
-            ),
-          }))
-        )
-      })
-      .catch(() => {
-        setSubjects((prev) =>
-          prev.map((s) => ({
-            ...s,
-            lessons: s.lessons.map((l) =>
-              l.id === expandedLesson ? { ...l, questions: [], loadingQuestions: false } : l
-            ),
-          }))
-        )
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandedLesson])
 
   // 로드된 문제만 집계
   const totalQuestions = subjects.reduce(
