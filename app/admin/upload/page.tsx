@@ -21,6 +21,8 @@ export default function UploadPage() {
   const [totalSessions, setTotalSessions] = useState<number | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
   const [allSessionsDone, setAllSessionsDone] = useState(false)
+  // 수업 날짜 (YYYY-MM-DD). 미입력 시 즉시 오픈
+  const [scheduledDate, setScheduledDate] = useState('')
   const [content, setContent] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -134,6 +136,7 @@ export default function UploadPage() {
           title: title.trim(),
           content: content.trim(),
           session_number: sessionNumber,
+          scheduled_date: scheduledDate || null,
         }),
         signal: uploadController.signal,
       })
@@ -236,6 +239,7 @@ export default function UploadPage() {
                 setTitle('')
                 setContent('')
                 setFile(null)
+                setScheduledDate('')
               }}
               className="w-full py-3 rounded-2xl bg-primary text-white text-sm font-semibold"
             >
@@ -322,6 +326,19 @@ export default function UploadPage() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={sessionNumber ? `예) ${sessionNumber}회차 - 반복문 for/while` : '예) 반복문 for/while'}
+              className="w-full text-sm text-gray-700 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200 focus:outline-none focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+              수업 날짜
+              <span className="ml-1 font-normal text-gray-400">(미입력 시 즉시 오픈)</span>
+            </label>
+            <input
+              type="date"
+              value={scheduledDate}
+              onChange={(e) => setScheduledDate(e.target.value)}
               className="w-full text-sm text-gray-700 bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200 focus:outline-none focus:border-primary"
             />
           </div>
