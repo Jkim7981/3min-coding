@@ -86,12 +86,14 @@ export default function SubjectRoadmapPage({ params }: { params: Promise<{ subje
   const [subjectName, setSubjectName] = useState('과목')
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     async function load() {
       try {
         // 과목명 조회
         const sRes = await fetch('/api/subjects')
+        if (!sRes.ok) throw new Error('과목 정보를 불러오지 못했습니다')
         const sData = await sRes.json()
         if (Array.isArray(sData)) {
           const found = sData.find((s: { id: string; name: string }) => s.id === subjectId)
@@ -100,6 +102,7 @@ export default function SubjectRoadmapPage({ params }: { params: Promise<{ subje
 
         // 회차 목록 조회
         const lRes = await fetch(`/api/subjects/${subjectId}/sessions`)
+        if (!lRes.ok) throw new Error('회차 목록을 불러오지 못했습니다')
         const lData = await lRes.json()
         if (!Array.isArray(lData)) return
 
@@ -112,6 +115,8 @@ export default function SubjectRoadmapPage({ params }: { params: Promise<{ subje
           status: i === 0 ? 'current' : i === 1 ? 'preview' : 'locked',
         }))
         setSessions(withStatus)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '불러오기에 실패했습니다')
       } finally {
         setLoading(false)
       }
@@ -147,6 +152,17 @@ export default function SubjectRoadmapPage({ params }: { params: Promise<{ subje
       {loading ? (
         <div className="flex justify-center mt-20">
           <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center mt-20 gap-3 text-center px-5">
+          <div className="text-4xl">⚠️</div>
+          <p className="text-sm text-gray-500">{error}</p>
+          <button
+            onClick={() => { setError(''); setLoading(true); }}
+            className="mt-1 px-5 py-2.5 rounded-2xl bg-primary text-white text-sm font-bold"
+          >
+            다시 시도
+          </button>
         </div>
       ) : sessions.length === 0 ? (
         <div className="flex flex-col items-center mt-20 gap-3 text-center px-5">

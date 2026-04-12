@@ -202,16 +202,12 @@ export default function UploadPage() {
           <div className="flex flex-col gap-2">
             <button
               onClick={() => {
+                // 과목 선택은 유지 — 같은 과목 다음 회차 연속 업로드 편의성
+                // subjectId useEffect가 자동으로 다음 sessionNumber 재계산
                 setSuccess(false)
                 setTitle('')
                 setContent('')
                 setFile(null)
-                // sessionNumber는 과목 선택 유지 시 자동 재계산됨 (subjectId useEffect)
-                // subjectId를 초기화하면 함께 리셋됨
-                setSubjectId('')
-                setSessionNumber(null)
-                setTotalSessions(null)
-                setAllSessionsDone(false)
               }}
               className="w-full py-3 rounded-2xl bg-primary text-white text-sm font-semibold"
             >

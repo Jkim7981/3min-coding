@@ -104,10 +104,18 @@ export default function QuestionPage({
   const prevQuestion = questions[currentIndex - 1]
 
   useEffect(() => {
+    // 문제 변경 시 모든 입력 상태 초기화 (이전/다음 이동 시 오염 방지)
+    setAnswer('')
+    setPhase('answering')
+    setShowHint(false)
+    setHintUsed(false)
+    setFirstAttemptAnswer('')
+    setError('')
+    setExecResult(null)
+
     if (question?.type === 'coding' && question.code_template) {
       const count = (question.code_template.match(/___/g) || []).length
       setBlankAnswers(Array(count).fill(''))
-      setExecResult(null)
     }
   }, [question])
 
@@ -235,8 +243,9 @@ export default function QuestionPage({
   const difficultyColor = { easy: 'text-green-600', medium: 'text-yellow-600', hard: 'text-red-600' }
   const difficultyLabel = { easy: '쉬움', medium: '보통', hard: '어려움' }
   const isAnswerable = phase === 'answering' || phase === 'first_wrong'
+  // 코딩 문제는 모든 빈칸을 채워야 제출 가능
   const hasAnswer = question.type === 'coding'
-    ? blankAnswers.some((a) => a.trim())
+    ? blankAnswers.every((a) => a.trim())
     : answer.trim()
 
   const outputMatch =
@@ -497,7 +506,7 @@ export default function QuestionPage({
         {/* ── 이전 / 다음 네비게이션 [B 추가] ── */}
         <div className="flex gap-2 mt-1">
           <button
-            onClick={() => router.push(`/questions/${prevQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)}
+            onClick={() => prevQuestion && router.push(`/questions/${prevQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)}
             disabled={!prevQuestion}
             className="flex-1 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-gray-50"
           >

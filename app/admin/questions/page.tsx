@@ -18,7 +18,8 @@ interface Lesson {
   id: string
   title: string
   session_number?: number
-  questions: Question[]
+  questions: Question[] | null  // null = 아직 로드 안 됨
+  loadingQuestions?: boolean
 }
 
 interface Subject {
@@ -51,6 +52,7 @@ export default function AdminQuestionsPage() {
   const [expandedLesson, setExpandedLesson] = useState<string | null>(null)
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null)
 
+  // 초기 로드: 과목 + 회차만 (문제는 lazy)
   useEffect(() => {
     async function loadAll() {
       try {
@@ -65,17 +67,13 @@ export default function AdminQuestionsPage() {
           sData.map(async (subject: { id: string; name: string }) => {
             const lRes = await fetch(`/api/subjects/${subject.id}/sessions`)
             const lData = await lRes.json()
-            const lessons = Array.isArray(lData) ? lData : []
-
-            const lessonsWithQuestions = await Promise.all(
-              lessons.map(async (lesson: { id: string; title: string; session_number?: number }) => {
-                const qRes = await fetch(`/api/sessions/${lesson.id}/questions`)
-                const qData = await qRes.json()
-                return { ...lesson, questions: Array.isArray(qData) ? qData : [] }
-              })
-            )
-
-            return { ...subject, lessons: lessonsWithQuestions }
+            const lessons: Lesson[] = Array.isArray(lData)
+              ? lData.map((l: { id: string; title: string; session_number?: number }) => ({
+                  ...l,
+                  questions: null, // 회차 열 때 lazy 로드
+                }))
+              : []
+            return { ...subject, lessons }
           })
         )
 
@@ -87,8 +85,54 @@ export default function AdminQuestionsPage() {
     loadAll()
   }, [retryKey])
 
+  // 회차 펼칠 때 문제 lazy 로드
+  useEffect(() => {
+    if (!expandedLesson) return
+
+    // 이미 로드됐으면 스킵
+    const lesson = subjects.flatMap((s) => s.lessons).find((l) => l.id === expandedLesson)
+    if (!lesson || lesson.questions !== null) return
+
+    // 로딩 상태 표시
+    setSubjects((prev) =>
+      prev.map((s) => ({
+        ...s,
+        lessons: s.lessons.map((l) =>
+          l.id === expandedLesson ? { ...l, loadingQuestions: true } : l
+        ),
+      }))
+    )
+
+    fetch(`/api/sessions/${expandedLesson}/questions`)
+      .then((r) => r.json())
+      .then((data) => {
+        setSubjects((prev) =>
+          prev.map((s) => ({
+            ...s,
+            lessons: s.lessons.map((l) =>
+              l.id === expandedLesson
+                ? { ...l, questions: Array.isArray(data) ? data : [], loadingQuestions: false }
+                : l
+            ),
+          }))
+        )
+      })
+      .catch(() => {
+        setSubjects((prev) =>
+          prev.map((s) => ({
+            ...s,
+            lessons: s.lessons.map((l) =>
+              l.id === expandedLesson ? { ...l, questions: [], loadingQuestions: false } : l
+            ),
+          }))
+        )
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedLesson])
+
+  // 로드된 문제만 집계
   const totalQuestions = subjects.reduce(
-    (acc, s) => acc + s.lessons.reduce((a, l) => a + l.questions.length, 0),
+    (acc, s) => acc + s.lessons.reduce((a, l) => a + (l.questions?.length ?? 0), 0),
     0
   )
 
@@ -126,7 +170,7 @@ export default function AdminQuestionsPage() {
           <h1 className="text-lg font-bold text-primary-dark">생성된 문제</h1>
         </div>
         <div className="bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-full">
-          총 {totalQuestions}문제
+          {totalQuestions > 0 ? `총 ${totalQuestions}문제` : '문제 탭하여 확인'}
         </div>
       </div>
 
@@ -168,7 +212,9 @@ export default function AdminQuestionsPage() {
                         <span className="text-sm font-semibold text-gray-800">{lesson.title}</span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs text-gray-400">{lesson.questions.length}문제</span>
+                        <span className="text-xs text-gray-400">
+                          {lesson.questions === null ? '...' : `${lesson.questions.length}문제`}
+                        </span>
                         <svg
                           width="16" height="16" viewBox="0 0 16 16" fill="none"
                           className={`transition-transform duration-200 ${expandedLesson === lesson.id ? 'rotate-180' : ''}`}
@@ -181,7 +227,11 @@ export default function AdminQuestionsPage() {
                     {/* 문제 목록 */}
                     {expandedLesson === lesson.id && (
                       <div className="border-t border-gray-100 divide-y divide-gray-50">
-                        {lesson.questions.length === 0 ? (
+                        {lesson.loadingQuestions ? (
+                          <div className="flex justify-center py-5">
+                            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        ) : !lesson.questions || lesson.questions.length === 0 ? (
                           <p className="text-xs text-gray-400 text-center py-4">문제가 없습니다</p>
                         ) : (
                           lesson.questions.map((q, idx) => (
