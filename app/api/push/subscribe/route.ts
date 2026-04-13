@@ -14,11 +14,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '유효하지 않은 구독 정보입니다' }, { status: 400 })
     }
 
-    // upsert: 같은 endpoint면 덮어씀
-    const { error } = await supabaseAdmin.from('push_subscriptions').upsert(
-      { user_id: user.id, subscription },
-      { onConflict: 'user_id,endpoint' }
-    )
+    // 같은 endpoint 기존 구독 삭제 후 재삽입
+    // (unique constraint가 jsonb 경로 표현식이라 onConflict 직접 지정 불가)
+    await supabaseAdmin
+      .from('push_subscriptions')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('subscription->>endpoint', subscription.endpoint)
+
+    const { error } = await supabaseAdmin
+      .from('push_subscriptions')
+      .insert({ user_id: user.id, subscription })
 
     if (error) throw error
 
