@@ -39,8 +39,8 @@
 
 ### 학생 기능
 **테스트 계정** 
-ID : dbtkd98@naver.com
-PW : dbtkd0320
+- ID : dbtkd98@naver.com
+- PW : dbtkd0320
 (개인에게 부여된 학원 코드가 없으면 회원가입 불가)
 
 - 오늘의 문제 조회
@@ -54,8 +54,8 @@ PW : dbtkd0320
 
 ### 강사 기능
 **테스트 계정** 
-ID : geunghyeong@naver.com
-PW : geunhyeong
+- ID : geunghyeong@naver.com
+- PW : geunhyeong
 
 - 과목 생성 및 수업 자료 업로드
 - 업로드한 수업 자료 기반 AI 문제 자동 생성
