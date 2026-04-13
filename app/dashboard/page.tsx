@@ -23,11 +23,21 @@ interface DailyQuestion {
   lessons: { title: string; session_number: number } | null
 }
 
+function calcDifficulty(answers: { is_correct: boolean }[]): 'easy' | 'medium' | 'hard' {
+  if (answers.length === 0) return 'medium'
+  const recent = answers.slice(0, 10)
+  const rate = recent.filter((a) => a.is_correct).length / recent.length
+  if (rate >= 0.8) return 'hard'
+  if (rate < 0.5) return 'easy'
+  return 'medium'
+}
+
 interface DashboardData {
   subjects: Subject[]
   thisWeek: number
   streak: number
   daily: { new: DailyQuestion[]; review: DailyQuestion[]; total: number }
+  targetDifficulty: 'easy' | 'medium' | 'hard'
 }
 
 function toKSTDate(timestamp: string): string {
@@ -59,7 +69,7 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
       .from('subjects')
       .select('id, name, teacher_id, created_at')
       .eq('teacher_id', userId)
-    return { subjects: data ?? [], thisWeek: 0, streak: 0, daily: { new: [], review: [], total: 0 } }
+    return { subjects: data ?? [], thisWeek: 0, streak: 0, daily: { new: [], review: [], total: 0 }, targetDifficulty: 'medium' as const }
   }
 
   // 수강 과목 + 전체 답안 병렬 조회
@@ -117,7 +127,16 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
         .order('created_at', { ascending: true })
 
       const unsolved = (allQuestions ?? []).filter((q) => !allAnsweredIds.has(q.id))
-      const newQuestions = unsolved.sort(() => Math.random() - 0.5).slice(0, 3) as unknown as DailyQuestion[]
+
+      // 적응형 난이도: 최근 10개 답안 기준으로 목표 난이도 계산
+      const targetDifficulty = calcDifficulty(answers)
+      const unsolvedTarget = unsolved.filter((q) => q.difficulty === targetDifficulty)
+      const unsolvedOther = unsolved.filter((q) => q.difficulty !== targetDifficulty)
+      // 목표 난이도 문제 우선, 부족하면 나머지로 채움
+      const newQuestions = [
+        ...unsolvedTarget.sort(() => Math.random() - 0.5),
+        ...unsolvedOther.sort(() => Math.random() - 0.5),
+      ].slice(0, 3) as unknown as DailyQuestion[]
 
       let reviewQuestions: DailyQuestion[] = []
       if (wrongIds.size > 0) {
@@ -151,7 +170,7 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
     }
   }
 
-  return { subjects, thisWeek, streak, daily }
+  return { subjects, thisWeek, streak, daily, targetDifficulty: calcDifficulty(answers) }
 }
 
 const difficultyLabel = (d: string) =>
@@ -164,7 +183,13 @@ export default async function DashboardPage() {
   if (!session?.user) redirect('/login')
 
   const user = session.user as AuthUser
-  const { subjects, thisWeek, streak, daily } = await fetchDashboardData(user)
+  const { subjects, thisWeek, streak, daily, targetDifficulty } = await fetchDashboardData(user)
+
+  const difficultyBadge = {
+    easy: { label: '쉬움 단계', color: 'bg-green-400/30 text-green-100' },
+    medium: { label: '보통 단계', color: 'bg-yellow-400/30 text-yellow-100' },
+    hard: { label: '어려움 단계', color: 'bg-red-400/30 text-red-100' },
+  }[targetDifficulty]
 
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -184,11 +209,18 @@ export default async function DashboardPage() {
             <p className="text-sm font-medium opacity-80">매일 아침 9시</p>
             <p className="font-bold text-lg">오늘의 문제 🔥</p>
           </div>
-          {daily.total > 0 && (
-            <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
-              {daily.total}문제
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {user.role === 'student' && (
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${difficultyBadge.color}`}>
+                {difficultyBadge.label}
+              </span>
+            )}
+            {daily.total > 0 && (
+              <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+                {daily.total}문제
+              </span>
+            )}
+          </div>
         </div>
 
         {daily.total > 0 ? (
