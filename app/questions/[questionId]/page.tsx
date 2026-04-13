@@ -74,6 +74,7 @@ export default function QuestionPage({
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('sessionId') ?? ''
   const subjectId = searchParams.get('subjectId') ?? ''
+  const ids = searchParams.get('ids') ?? ''
   const router = useRouter()
 
   const [questions, setQuestions] = useState<Question[]>([])
@@ -109,8 +110,19 @@ export default function QuestionPage({
         })
         .catch(() => setError('네트워크 오류'))
         .finally(() => setLoading(false))
+    } else if (ids) {
+      // 대시보드 오늘의 문제: ids 파라미터로 전체 목록 병렬 로드 (이전/다음 네비게이션 가능)
+      const idList = ids.split(',').filter(Boolean)
+      Promise.all(idList.map((id) => fetch(`/api/questions/${id}`).then((r) => r.json())))
+        .then((results) => {
+          const valid = results.filter((d) => d.id)
+          if (valid.length > 0) setQuestions(valid)
+          else setError('문제를 불러올 수 없습니다')
+        })
+        .catch(() => setError('네트워크 오류'))
+        .finally(() => setLoading(false))
     } else {
-      // 대시보드 오늘의 문제 등 세션 없이 단일 문제로 진입한 경우
+      // ids 없이 단일 문제로 직접 진입한 경우
       fetch(`/api/questions/${questionId}`)
         .then((r) => r.json())
         .then((data) => {
@@ -120,7 +132,7 @@ export default function QuestionPage({
         .catch(() => setError('네트워크 오류'))
         .finally(() => setLoading(false))
     }
-  }, [sessionId, questionId])
+  }, [sessionId, ids, questionId])
 
   const question = questions.find((q) => q.id === questionId)
   const currentIndex = questions.findIndex((q) => q.id === questionId)
@@ -245,6 +257,7 @@ export default function QuestionPage({
           is_correct: 'true',
           sessionId,
           subjectId,
+          ...(ids ? { ids } : {}),
           ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
         })
         router.push(`/questions/${question.id}/result?${params}`)
@@ -261,6 +274,7 @@ export default function QuestionPage({
           student_answer: currentAnswer,
           sessionId,
           subjectId,
+          ...(ids ? { ids } : {}),
           ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
         })
         router.push(`/questions/${question.id}/result?${params}`)
@@ -654,6 +668,7 @@ export default function QuestionPage({
                     student_answer: previousResult.student_answer,
                     sessionId,
                     subjectId,
+                    ...(ids ? { ids } : {}),
                     ...(nextQuestion ? { nextQuestionId: nextQuestion.id } : {}),
                   })
                   router.push(`/questions/${question.id}/result?${p}`)
@@ -666,10 +681,14 @@ export default function QuestionPage({
           </>
         )}
 
-        {/* ── 이전 / 다음 네비게이션 [B 추가] ── */}
+        {/* ── 이전 / 다음 네비게이션 ── */}
         <div className="flex gap-2 mt-1">
           <button
-            onClick={() => prevQuestion && router.push(`/questions/${prevQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)}
+            onClick={() => {
+              if (!prevQuestion) return
+              const p = new URLSearchParams({ sessionId, subjectId, ...(ids ? { ids } : {}) })
+              router.push(`/questions/${prevQuestion.id}?${p}`)
+            }}
             disabled={!prevQuestion}
             className="flex-1 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 text-sm font-semibold flex items-center justify-center gap-1.5 disabled:opacity-30 disabled:cursor-not-allowed transition-colors hover:bg-gray-50"
           >
@@ -679,12 +698,16 @@ export default function QuestionPage({
             이전
           </button>
           <button
-            onClick={() => nextQuestion
-              ? router.push(`/questions/${nextQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)
-              : (subjectId && sessionId)
-                ? router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
-                : router.push('/dashboard')
-            }
+            onClick={() => {
+              if (nextQuestion) {
+                const p = new URLSearchParams({ sessionId, subjectId, ...(ids ? { ids } : {}) })
+                router.push(`/questions/${nextQuestion.id}?${p}`)
+              } else if (subjectId && sessionId) {
+                router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
+              } else {
+                router.push('/dashboard')
+              }
+            }}
             className="flex-1 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors hover:bg-gray-50"
           >
             {nextQuestion ? '다음' : '목록'}
