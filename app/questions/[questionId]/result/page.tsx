@@ -78,8 +78,11 @@ export default function QuestionResultPage({
   const handleNext = () => {
     if (nextQuestionId) {
       router.push(`/questions/${nextQuestionId}?sessionId=${sessionId}&subjectId=${subjectId}`)
-    } else {
+    } else if (subjectId && sessionId) {
       router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
+    } else {
+      // 대시보드 오늘의 문제에서 진입한 경우 (sessionId/subjectId 없음)
+      router.push('/dashboard')
     }
   }
 
