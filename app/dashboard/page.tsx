@@ -20,6 +20,24 @@ interface DailyQuestion {
   question: string
   lesson_id: string
   lessons: { title: string; session_number: number } | null
+  is_done: boolean      // 완전히 끝남 (정답 or 2차 오답)
+  is_correct: boolean   // 최종 정답 여부
+}
+
+// 날짜 + 유저 ID 기반 결정론적 셔플
+// 같은 날 같은 유저에게는 항상 동일한 순서 → 대시보드 새로고침해도 목록 안 바뀜
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed + 1) * 10000
+  return x - Math.floor(x)
+}
+
+function shuffleSeeded<T>(arr: T[], seed: number): T[] {
+  const result = [...arr]
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(seededRandom(seed + i) * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
 }
 
 function calcDifficulty(answers: { is_correct: boolean }[]): 'easy' | 'medium' | 'hard' {
@@ -62,6 +80,12 @@ function calcStreak(timestamps: string[]): number {
 
 async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
   const userId = user.id
+  // KST 날짜 기반 시드: 같은 날 같은 유저는 항상 동일한 문제 순서
+  const kstToday = toKSTDate(new Date().toISOString())
+  const dateSeed = parseInt(kstToday.replace(/-/g, ''), 10) // e.g. 20260413
+  // 유저 ID(UUID) 앞 8자리를 16진수로 변환해 더함 → 유저마다 다른 조합
+  const userSeed = parseInt(userId.replace(/-/g, '').slice(0, 8), 16) % 1000000
+  const dailySeed = dateSeed + userSeed
 
   if (user.role === 'teacher') {
     const { data } = await supabaseAdmin
@@ -79,7 +103,7 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
       .eq('student_id', userId),
     supabaseAdmin
       .from('user_answers')
-      .select('answered_at, question_id, is_correct, subject_id')
+      .select('answered_at, question_id, is_correct, subject_id, attempt')
       .eq('student_id', userId)
       .order('answered_at', { ascending: false }),
   ])
@@ -87,7 +111,13 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
   const enrollments = enrollmentResult.data ?? []
   const subjects = enrollments.map((e) => (e as any).subjects).filter(Boolean) as Subject[]
   const subjectIds = enrollments.map((e) => e.subject_id)
-  const answers = answersResult.data ?? []
+  const answers = (answersResult.data ?? []) as {
+    answered_at: string
+    question_id: string
+    is_correct: boolean
+    subject_id: string | null
+    attempt: number
+  }[]
 
   // 이번 주 / 스트릭
   const mondayUTC = (() => {
@@ -118,46 +148,57 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
         (a) => a.subject_id && subjectIds.includes(a.subject_id)
       )
       const correctIds = new Set(answersInSubjects.filter((a) => a.is_correct).map((a) => a.question_id))
-      const wrongIds = new Set(answersInSubjects.filter((a) => !a.is_correct).map((a) => a.question_id))
-      const allAnsweredIds = new Set([...correctIds, ...wrongIds])
+      // 완전히 끝난 오답: 2차 시도까지 마친 것 (attempt=2 & wrong) 또는 정답 처리된 것
+      const attempt2WrongIds = new Set(
+        answersInSubjects.filter((a) => !a.is_correct && a.attempt === 2).map((a) => a.question_id)
+      )
+      // doneIds: 완전히 완료된 문제 (정답 or 2차 오답)
+      const doneIds = new Set([...correctIds, ...attempt2WrongIds])
 
-      const { data: allQuestions } = await supabaseAdmin
-        .from('questions')
-        .select('id, type, difficulty, question, lesson_id, lessons(title, session_number)')
-        .in('lesson_id', lessonIds)
-        .order('created_at', { ascending: true })
+      // 문제 목록 + SM-2 복습 스케줄 병렬 조회
+      const [questionsResult, reviewScheduleResult] = await Promise.all([
+        supabaseAdmin
+          .from('questions')
+          .select('id, type, difficulty, question, lesson_id, lessons(title, session_number)')
+          .in('lesson_id', lessonIds)
+          .order('created_at', { ascending: true }),
+        supabaseAdmin
+          .from('review_schedule')
+          .select('question_id')
+          .eq('student_id', userId)
+          .lte('next_review_date', kstToday)  // 오늘 이전 복습 예정된 문제만
+          .order('next_review_date', { ascending: true }),  // 오래된 것 우선
+      ])
 
-      const unsolved = (allQuestions ?? []).filter((q) => !allAnsweredIds.has(q.id))
-      const unsolvedTarget = unsolved.filter((q) => q.difficulty === targetDifficulty)
-      const unsolvedOther = unsolved.filter((q) => q.difficulty !== targetDifficulty)
-      // 목표 난이도 문제 우선, 부족하면 나머지로 채움
+      const allQ = questionsResult.data ?? []
+      // SM-2 기준 오늘 복습해야 할 question_id 집합
+      const dueIds = new Set((reviewScheduleResult.data ?? []).map((s) => s.question_id))
+
+      // 전체 문제 풀에서 목표 난이도 우선 선택 (answeredIds 제외 안 함 → 오늘 5문제 하루 종일 고정)
+      const targetQ = allQ.filter((q) => q.difficulty === targetDifficulty)
+      const otherQ = allQ.filter((q) => q.difficulty !== targetDifficulty)
       const newQuestions = [
-        ...unsolvedTarget.sort(() => Math.random() - 0.5),
-        ...unsolvedOther.sort(() => Math.random() - 0.5),
-      ].slice(0, 3) as unknown as DailyQuestion[]
+        ...shuffleSeeded(targetQ, dailySeed),
+        ...shuffleSeeded(otherQ, dailySeed + 1),
+      ].slice(0, 3).map((q) => ({
+        ...q,
+        is_done: doneIds.has(q.id),
+        is_correct: correctIds.has(q.id),
+      })) as unknown as DailyQuestion[]
 
       let reviewQuestions: DailyQuestion[] = []
-      if (wrongIds.size > 0) {
-        const wrongQList = (allQuestions ?? []).filter((q) => wrongIds.has(q.id))
-        const wrongLessonIds = [...new Set(wrongQList.map((q) => q.lesson_id))]
+      if (dueIds.size > 0) {
         const newQIds = new Set(newQuestions.map((q) => q.id))
-        const sameConceptUnsolved = (allQuestions ?? []).filter(
-          (q) =>
-            wrongLessonIds.includes(q.lesson_id) &&
-            !allAnsweredIds.has(q.id) &&
-            !newQIds.has(q.id)
-        )
-        if (sameConceptUnsolved.length >= 2) {
-          reviewQuestions = sameConceptUnsolved.sort(() => Math.random() - 0.5).slice(0, 2) as unknown as DailyQuestion[]
-        } else {
-          const wrongList = wrongQList
-            .filter((q) => !newQIds.has(q.id))
-            .sort(() => Math.random() - 0.5)
-          reviewQuestions = [
-            ...sameConceptUnsolved,
-            ...wrongList.slice(0, 2 - sameConceptUnsolved.length),
-          ].slice(0, 2) as unknown as DailyQuestion[]
-        }
+        // SM-2 스케줄 기준: 오늘 복습 예정 문제 중 새 문제와 겹치지 않는 것
+        const reviewPool = shuffleSeeded(
+          allQ.filter((q) => dueIds.has(q.id) && !newQIds.has(q.id)),
+          dailySeed + 2
+        ).slice(0, 2)
+        reviewQuestions = reviewPool.map((q) => ({
+          ...q,
+          is_done: doneIds.has(q.id),
+          is_correct: correctIds.has(q.id),
+        })) as unknown as DailyQuestion[]
       }
 
       daily = {
@@ -189,6 +230,12 @@ export default async function DashboardPage() {
     hard: { label: '어려움 단계', color: 'bg-red-400/30 text-red-100' },
   }[targetDifficulty]
 
+  // 오늘의 문제 전체 ID 목록 (순서 고정 — 클릭 시점에 URL로 확정)
+  const allDailyQuestions = [...daily.new, ...daily.review]
+  const allDailyIds = allDailyQuestions.map((q) => q.id).join(',')
+  const allDone = daily.total > 0 && allDailyQuestions.every((q) => q.is_done)
+  const wrongDailyQuestions = allDailyQuestions.filter((q) => q.is_done && !q.is_correct)
+
   return (
     <div className="flex flex-col gap-5 p-5">
       {/* 헤더 (우측 햄버거 버튼 공간 확보) */}
@@ -218,39 +265,82 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {daily.total > 0 ? (
+        {allDone ? (
+          /* ── 전체 완료 화면 ── */
+          <div className="mb-4">
+            <div className="bg-white/15 rounded-xl px-4 py-4 mb-3 text-center">
+              <p className="text-2xl mb-1">🎉</p>
+              <p className="font-bold text-base">오늘의 문제를 모두 완료했어요!</p>
+              <p className="text-xs opacity-70 mt-1">내일 새로운 문제가 기다리고 있어요</p>
+            </div>
+            {wrongDailyQuestions.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold opacity-70 mb-2 px-1">틀린 문제 다시 보기</p>
+                <div className="flex flex-col gap-2">
+                  {wrongDailyQuestions.map((q) => (
+                    <Link
+                      key={q.id}
+                      href={`/questions/${q.id}?ids=${allDailyIds}`}
+                      className="bg-red-400/20 hover:bg-red-400/30 transition-colors rounded-xl px-3 py-2.5 flex items-center gap-2"
+                    >
+                      <span className="text-xs bg-red-400/30 text-red-100 rounded-md px-1.5 py-0.5 font-medium shrink-0">
+                        오답
+                      </span>
+                      <span className="text-sm font-medium truncate flex-1">{q.question}</span>
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="shrink-0 opacity-60">
+                        <path d="M5 2l5 5-5 5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : daily.total > 0 ? (
+          /* ── 진행 중 문제 목록 ── */
           <div className="flex flex-col gap-2 mb-4">
             {daily.new.map((q, i) => (
               <Link
                 key={q.id}
-                href={`/questions/${q.id}`}
-                className="bg-white/15 hover:bg-white/25 transition-colors rounded-xl px-3 py-2.5 flex items-center gap-2"
+                href={`/questions/${q.id}?ids=${allDailyIds}`}
+                className={`transition-colors rounded-xl px-3 py-2.5 flex items-center gap-2 ${
+                  q.is_done ? 'bg-white/8 opacity-60' : 'bg-white/15 hover:bg-white/25'
+                }`}
               >
                 <span className="text-xs bg-white/20 rounded-md px-1.5 py-0.5 font-medium shrink-0">
                   새 문제 {i + 1}
                 </span>
                 <span className="text-sm font-medium truncate flex-1">{q.question}</span>
-                <span className={`text-xs font-medium shrink-0 ${difficultyColor(q.difficulty)} bg-white/10 rounded px-1.5 py-0.5`}>
-                  {difficultyLabel(q.difficulty)}
-                </span>
+                {q.is_done ? (
+                  <span className="text-xs font-bold text-green-300 shrink-0">✓</span>
+                ) : (
+                  <span className={`text-xs font-medium shrink-0 ${difficultyColor(q.difficulty)} bg-white/10 rounded px-1.5 py-0.5`}>
+                    {difficultyLabel(q.difficulty)}
+                  </span>
+                )}
               </Link>
             ))}
             {daily.review.map((q, i) => (
               <Link
                 key={q.id}
-                href={`/questions/${q.id}`}
-                className="bg-white/10 hover:bg-white/20 transition-colors rounded-xl px-3 py-2.5 flex items-center gap-2"
+                href={`/questions/${q.id}?ids=${allDailyIds}`}
+                className={`transition-colors rounded-xl px-3 py-2.5 flex items-center gap-2 ${
+                  q.is_done ? 'bg-white/8 opacity-60' : 'bg-white/10 hover:bg-white/20'
+                }`}
               >
                 <span className="text-xs bg-yellow-400/30 text-yellow-100 rounded-md px-1.5 py-0.5 font-medium shrink-0">
                   복습 {i + 1}
                 </span>
                 <span className="text-sm font-medium truncate flex-1">{q.question}</span>
+                {q.is_done && (
+                  <span className="text-xs font-bold text-green-300 shrink-0">✓</span>
+                )}
               </Link>
             ))}
           </div>
         ) : (
           <div className="bg-white/10 rounded-xl px-4 py-3 mb-4 text-sm opacity-80">
-            오늘의 문제를 모두 완료했어요! 🎉
+            오늘의 문제가 없어요. 수강 중인 과목을 확인해보세요.
           </div>
         )}
 

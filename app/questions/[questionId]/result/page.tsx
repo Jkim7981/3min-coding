@@ -21,6 +21,7 @@ export default function QuestionResultPage({
 
   const sessionId = searchParams.get('sessionId') ?? ''
   const subjectId = searchParams.get('subjectId') ?? ''
+  const ids = searchParams.get('ids') ?? ''
   const isCorrect = searchParams.get('is_correct') === 'true'
   const correctAnswer = searchParams.get('correct_answer') ?? ''
   const studentAnswer = searchParams.get('student_answer') ?? ''
@@ -31,18 +32,24 @@ export default function QuestionResultPage({
   const [loadingExplanation, setLoadingExplanation] = useState(false)
   const [explanationError, setExplanationError] = useState(false)
 
-  // 세션에서 문제 텍스트 조회
+  // 문제 텍스트 조회 (세션 문맥 있으면 세션 API, 없으면 단건 API)
   useEffect(() => {
-    if (!sessionId) return
-    fetch(`/api/sessions/${sessionId}/questions`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) {
-          const q = data.find((q: Question) => q.id === questionId)
-          if (q) setQuestion(q)
-        }
-      })
-      .catch(() => {})
+    if (sessionId) {
+      fetch(`/api/sessions/${sessionId}/questions`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const q = data.find((q: Question) => q.id === questionId)
+            if (q) setQuestion(q)
+          }
+        })
+        .catch(() => {})
+    } else {
+      fetch(`/api/questions/${questionId}`)
+        .then((r) => r.json())
+        .then((data) => { if (data.id) setQuestion(data) })
+        .catch(() => {})
+    }
   }, [sessionId, questionId])
 
   // 오답 시 AI 해설 자동 조회 (30초 타임아웃)
@@ -77,7 +84,8 @@ export default function QuestionResultPage({
 
   const handleNext = () => {
     if (nextQuestionId) {
-      router.push(`/questions/${nextQuestionId}?sessionId=${sessionId}&subjectId=${subjectId}`)
+      const p = new URLSearchParams({ sessionId, subjectId, ...(ids ? { ids } : {}) })
+      router.push(`/questions/${nextQuestionId}?${p}`)
     } else if (subjectId && sessionId) {
       router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
     } else {
