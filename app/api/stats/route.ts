@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     // 전체 답안 조회 (과목 필터 선택)
     let query = supabaseAdmin
       .from('user_answers')
-      .select('is_correct, answered_at, subject_id')
+      .select('question_id, is_correct, answered_at, subject_id')
       .eq('student_id', user.id)
 
     if (subject_id) {
@@ -25,39 +25,65 @@ export async function GET(req: NextRequest) {
 
     if (aError) throw aError
 
-    const total = answers?.length ?? 0
-    const correct = answers?.filter((a) => a.is_correct).length ?? 0
+    const allAnswers = answers ?? []
+
+    // 같은 문제를 여러 번 시도해도 1문제로 카운트 (question_id 기준 중복 제거)
+    // 정답: 한 번이라도 맞힌 문제 수 / 전체 고유 문제 수
+    const questionMap = new Map<string, { is_correct: boolean; answered_at: string; subject_id: string | null }>()
+    for (const a of allAnswers) {
+      const existing = questionMap.get(a.question_id)
+      if (!existing) {
+        questionMap.set(a.question_id, { is_correct: a.is_correct, answered_at: a.answered_at, subject_id: a.subject_id })
+      } else {
+        if (a.is_correct) existing.is_correct = true
+        // 가장 최근 시도 날짜 유지 (스트릭/이번주 집계용)
+        if (new Date(a.answered_at) > new Date(existing.answered_at)) {
+          existing.answered_at = a.answered_at
+        }
+      }
+    }
+
+    const uniqueAnswers = Array.from(questionMap.values())
+    const total = uniqueAnswers.length
+    const correct = uniqueAnswers.filter((a) => a.is_correct).length
     const correct_rate = total > 0 ? Math.round((correct / total) * 100) / 100 : 0
 
-    // 이번 주 푼 문제 수 (월요일 기준, KST)
+    // 이번 주 푼 문제 수 (월요일 기준, KST) — 고유 문제 수 기준
     const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000)
     const mondayKST = new Date(nowKST)
     mondayKST.setUTCDate(nowKST.getUTCDate() - ((nowKST.getUTCDay() + 6) % 7))
     mondayKST.setUTCHours(0, 0, 0, 0)
-    // monday 기준을 UTC로 역산 (비교는 원본 UTC 타임스탬프 기준)
     const mondayUTC = new Date(mondayKST.getTime() - 9 * 60 * 60 * 1000)
-    const this_week = answers?.filter((a) => new Date(a.answered_at) >= mondayUTC).length ?? 0
+
+    // 이번 주에 시도한 question_id (중복 제거) — 원본 allAnswers 기준으로 집계
+    const thisWeekQIds = new Set(
+      allAnswers.filter((a) => new Date(a.answered_at) >= mondayUTC).map((a) => a.question_id)
+    )
+    const this_week = thisWeekQIds.size
 
     // 학습 스트릭 계산 (연속 학습 일수, KST)
-    const streak = calcStreak(answers?.map((a) => a.answered_at) ?? [])
+    const streak = calcStreak(allAnswers.map((a) => a.answered_at))
 
     // 과목별 정답률 (subject_id 미지정 시)
     let by_subject: { subject_id: string; total: number; correct_rate: number }[] = []
-    if (!subject_id && answers && answers.length > 0) {
-      const subjectMap = new Map<string, { total: number; correct: number }>()
+    if (!subject_id && allAnswers.length > 0) {
+      // 과목별로 고유 문제 수 / 정답 문제 수 집계
+      const subjectMap = new Map<string, { questions: Set<string>; correct: Set<string> }>()
 
-      for (const a of answers) {
+      for (const a of allAnswers) {
         if (!a.subject_id) continue
-        const cur = subjectMap.get(a.subject_id) ?? { total: 0, correct: 0 }
-        cur.total += 1
-        if (a.is_correct) cur.correct += 1
-        subjectMap.set(a.subject_id, cur)
+        if (!subjectMap.has(a.subject_id)) {
+          subjectMap.set(a.subject_id, { questions: new Set(), correct: new Set() })
+        }
+        const cur = subjectMap.get(a.subject_id)!
+        cur.questions.add(a.question_id)
+        if (a.is_correct) cur.correct.add(a.question_id)
       }
 
       by_subject = Array.from(subjectMap.entries()).map(([sid, val]) => ({
         subject_id: sid,
-        total: val.total,
-        correct_rate: Math.round((val.correct / val.total) * 100) / 100,
+        total: val.questions.size,
+        correct_rate: Math.round((val.correct.size / val.questions.size) * 100) / 100,
       }))
     }
 
