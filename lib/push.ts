@@ -17,7 +17,10 @@ export async function sendPushNotification(
   payload: PushPayload
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await webpush.sendNotification(subscription, JSON.stringify(payload))
+    await webpush.sendNotification(subscription, JSON.stringify(payload), {
+      urgency: 'high',  // FCM/APNs에 즉시 배달 요청 (기본값 normal은 수십 분 지연 가능)
+      TTL: 3600,        // 기기 꺼져 있어도 1시간 내 재시도
+    })
     return { success: true }
   } catch (err: unknown) {
     const statusCode = (err as { statusCode?: number }).statusCode
