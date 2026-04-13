@@ -103,6 +103,8 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
 
   // 오늘의 문제
   let daily: DashboardData['daily'] = { new: [], review: [], total: 0 }
+  // 적응형 난이도: 최근 10개 답안 기준으로 목표 난이도 계산 (return에서 재사용)
+  const targetDifficulty = calcDifficulty(answers)
 
   if (subjectIds.length > 0) {
     const { data: lessons } = await supabaseAdmin
@@ -127,9 +129,6 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
         .order('created_at', { ascending: true })
 
       const unsolved = (allQuestions ?? []).filter((q) => !allAnsweredIds.has(q.id))
-
-      // 적응형 난이도: 최근 10개 답안 기준으로 목표 난이도 계산
-      const targetDifficulty = calcDifficulty(answers)
       const unsolvedTarget = unsolved.filter((q) => q.difficulty === targetDifficulty)
       const unsolvedOther = unsolved.filter((q) => q.difficulty !== targetDifficulty)
       // 목표 난이도 문제 우선, 부족하면 나머지로 채움
