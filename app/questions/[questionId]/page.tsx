@@ -99,16 +99,28 @@ export default function QuestionPage({
   const [previousResult, setPreviousResult] = useState<PreviousResult | null>(null)
 
   useEffect(() => {
-    if (!sessionId) return
-    fetch(`/api/sessions/${sessionId}/questions`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data)) setQuestions(data)
-        else setError(data.error ?? '오류가 발생했습니다')
-      })
-      .catch(() => setError('네트워크 오류'))
-      .finally(() => setLoading(false))
-  }, [sessionId])
+    if (sessionId) {
+      // 세션 문맥이 있으면 세션 전체 문제 목록 조회 (이전/다음 네비게이션 가능)
+      fetch(`/api/sessions/${sessionId}/questions`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setQuestions(data)
+          else setError(data.error ?? '오류가 발생했습니다')
+        })
+        .catch(() => setError('네트워크 오류'))
+        .finally(() => setLoading(false))
+    } else {
+      // 대시보드 오늘의 문제 등 세션 없이 단일 문제로 진입한 경우
+      fetch(`/api/questions/${questionId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.id) setQuestions([data])
+          else setError(data.error ?? '문제를 찾을 수 없습니다')
+        })
+        .catch(() => setError('네트워크 오류'))
+        .finally(() => setLoading(false))
+    }
+  }, [sessionId, questionId])
 
   const question = questions.find((q) => q.id === questionId)
   const currentIndex = questions.findIndex((q) => q.id === questionId)
