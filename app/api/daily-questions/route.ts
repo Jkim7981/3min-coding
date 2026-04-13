@@ -4,6 +4,9 @@ import { requireAuth } from '@/lib/auth'
 
 // GET /api/daily-questions
 // 오늘의 문제: 새 문제 3개 + 복습 문제 2개 (같은 회차에서 다른 문제)
+// NOTE: 현재 대시보드(app/dashboard/page.tsx)는 이 API를 직접 호출하지 않고
+//       서버 컴포넌트에서 Supabase를 직접 조회합니다.
+//       향후 클라이언트 컴포넌트로 전환 시 활용 예정으로 보존합니다.
 export async function GET() {
   try {
     const { user, response } = await requireAuth()
