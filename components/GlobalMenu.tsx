@@ -184,7 +184,7 @@ export default function GlobalMenu() {
   // 비로그인 또는 로그인 페이지에서는 숨김
   if (status !== 'authenticated' || pathname === '/login') return null
 
-  const role = (session?.user as any)?.role as string | undefined
+  const role = (session?.user as { role?: string })?.role
   const tabs = role === 'teacher' ? teacherTabs : studentTabs
 
   const isActive = (href: string) => {
