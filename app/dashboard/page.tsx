@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { authOptions } from '@/lib/authOptions'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { AuthUser } from '@/lib/auth'
-import SignOutButton from './SignOutButton'
 import PushSubscriber from './PushSubscriber'
 
 interface Subject {
@@ -192,13 +191,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-5 p-5">
-      {/* 헤더 */}
-      <div className="pt-4 flex items-start justify-between">
-        <div>
-          <p className="text-sm text-gray-500">안녕하세요!</p>
-          <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{user.name}님 👋</h1>
-        </div>
-        <SignOutButton />
+      {/* 헤더 (우측 햄버거 버튼 공간 확보) */}
+      <div className="pt-4 pr-12">
+        <p className="text-sm text-gray-500">안녕하세요!</p>
+        <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{user.name}님 👋</h1>
       </div>
 
       {/* 오늘의 문제 */}

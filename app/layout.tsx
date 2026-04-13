@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import Providers from '@/components/Providers'
 import Nav from '@/components/Nav'
+import GlobalMenu from '@/components/GlobalMenu'
 import ErrorBoundary from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
@@ -37,6 +38,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <Nav />
+          <GlobalMenu />
           <main className="flex-1">
             <ErrorBoundary>{children}</ErrorBoundary>
           </main>
