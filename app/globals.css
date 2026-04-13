@@ -34,3 +34,8 @@ body {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Tailwind v4 스캐너가 동적 ternary 클래스를 놓칠 수 있는 케이스 보완 */
+@layer utilities {
+  .bg-white\/8 { background-color: rgb(255 255 255 / 0.08); }
+}

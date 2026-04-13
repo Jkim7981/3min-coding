@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendPushNotification } from '@/lib/push'
+import { env } from '@/lib/env'
 import type { PushSubscription } from 'web-push'
 
 // GET /api/cron/daily-notify
-// Vercel Cron이 매일 UTC 07:00 (한국시간 16:00)에 호출
+// Vercel Cron이 매일 UTC 00:00 (한국시간 09:00)에 호출
 // ※ Vercel Cron은 반드시 GET 요청을 사용함
 export async function GET(req: NextRequest) {
   // Vercel Cron 인증 확인
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: '인증 실패' }, { status: 401 })
   }
 
