@@ -14,8 +14,8 @@ export const metadata: Metadata = {
     title: '3분코딩',
   },
   icons: {
-    icon: '/icon.png',
-    apple: '/icon.png',
+    icon: '/icon-192.png',
+    apple: '/icon-192.png',
   },
 }
 
