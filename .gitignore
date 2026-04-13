@@ -40,3 +40,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .gstack/
+
+# PWA generated files (빌드 시 자동 생성 — git에 올리면 캐시 불일치 발생)
+public/sw.js
+public/workbox-*.js
+public/swe-worker-*.js
