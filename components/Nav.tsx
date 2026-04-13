@@ -29,7 +29,7 @@ export default function Nav() {
   const hiddenRoutes = ['/dashboard', '/subjects', '/admin', '/login', '/questions']
   if (hiddenRoutes.some((p) => pathname.startsWith(p))) return null
 
-  const role = (session?.user as any)?.role as string | undefined
+  const role = session?.user?.role
   const links = role === 'teacher' ? teacherLinks : studentLinks
 
   const isActive = (href: string) => pathname === href

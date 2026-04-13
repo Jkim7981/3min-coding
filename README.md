@@ -118,17 +118,17 @@ flowchart TD
 
 ## 기술 스택
 
-| 영역 | 기술 |
-| --- | --- |
-| Frontend | Next.js 16, React 19, Tailwind CSS 4 |
-| Backend | Next.js App Router API Routes |
-| Auth | NextAuth Credentials |
-| Database | Supabase |
-| AI | OpenAI API (`gpt-4o`, `gpt-4o-mini`) |
-| Code Execution | Judge0 CE |
-| PWA | `@ducanh2912/next-pwa` |
-| Push Notification | Web Push, VAPID, Vercel Cron |
-| Language | TypeScript |
+| 영역              | 기술                                 |
+| ----------------- | ------------------------------------ |
+| Frontend          | Next.js 16, React 19, Tailwind CSS 4 |
+| Backend           | Next.js App Router API Routes        |
+| Auth              | NextAuth Credentials                 |
+| Database          | Supabase                             |
+| AI                | OpenAI API (`gpt-4o`, `gpt-4o-mini`) |
+| Code Execution    | Judge0 CE                            |
+| PWA               | `@ducanh2912/next-pwa`               |
+| Push Notification | Web Push, VAPID, Vercel Cron         |
+| Language          | TypeScript                           |
 
 ## 아키텍처 포인트
 
@@ -188,14 +188,6 @@ public/                      PWA manifest, icons, service worker
 
 - 라이브 URL: [https://3min-coding.vercel.app/](https://3min-coding.vercel.app/)
 - GitHub 저장소: [https://github.com/Jkim7981/3min-coding](https://github.com/Jkim7981/3min-coding)
-
-추가하면 좋은 항목:
-
-- 로그인 화면 캡처
-- 학생 대시보드 캡처
-- 문제 풀이 화면 캡처
-- 통계 / 리포트 화면 캡처
-- 강사 업로드 / 문제 생성 화면 캡처
 
 ## 로컬 실행 방법
 

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { requireAuth } from '@/lib/auth'
 
+type QuestionLessonRelation =
+  | { subject_id: string }
+  | { subject_id: string }[]
+  | null
+
 // GET /api/stats?subject_id=xxx - 학생 학습 통계 조회
 export async function GET(req: NextRequest) {
   try {
@@ -89,18 +94,34 @@ export async function GET(req: NextRequest) {
 
     // 오늘 복습할 문제 수
     const todayKST = toKSTDate(new Date().toISOString())
-    let reviewQuery = supabaseAdmin
+    const { data: dueReviewRows, error: reviewError } = await supabaseAdmin
       .from('review_schedule')
-      .select('id', { count: 'exact', head: true })
+      .select('question_id')
       .eq('student_id', user.id)
       .lte('next_review_date', todayKST)
 
-    if (subject_id) {
-      // review_schedule에 subject_id 없으므로 question → lesson → subject 경로 불필요,
-      // 전체 due_reviews 반환 (과목 필터 시에도 전체 복습 수 표시)
-    }
+    if (reviewError) throw reviewError
 
-    const { count: due_reviews } = await reviewQuery
+    const dueQuestionIds = [...new Set((dueReviewRows ?? []).map((row) => row.question_id))]
+    let due_reviews = dueQuestionIds.length
+
+    if (subject_id && dueQuestionIds.length > 0) {
+      const { data: dueQuestions, error: dueQuestionsError } = await supabaseAdmin
+        .from('questions')
+        .select('id, lessons(subject_id)')
+        .in('id', dueQuestionIds)
+
+      if (dueQuestionsError) throw dueQuestionsError
+
+      due_reviews = (dueQuestions ?? []).filter((question) => {
+        const lessonsData = question.lessons as QuestionLessonRelation
+        const reviewSubjectId = Array.isArray(lessonsData)
+          ? (lessonsData[0]?.subject_id ?? null)
+          : (lessonsData?.subject_id ?? null)
+
+        return reviewSubjectId === subject_id
+      }).length
+    }
 
     // 최근 7일 일별 정답률 트렌드 (KST 기준)
     const recent_accuracy_trend = calcTrend(answers ?? [], 7)
