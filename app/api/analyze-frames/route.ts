@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { requireTeacher } from '@/lib/auth'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 export async function POST(req: NextRequest) {
+  const { response } = await requireTeacher()
+  if (response) return response
+
   try {
     const formData = await req.formData()
     const frames = formData.getAll('frames') as File[]

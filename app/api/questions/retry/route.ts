@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
           code_template,
           expected_output,
           hint,
-          answer,
           explanation
         )
       `
