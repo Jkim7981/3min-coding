@@ -30,6 +30,10 @@ export default function UploadPage() {
   const [generatingQuestions, setGeneratingQuestions] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  // 영상 분석 상태
+  type VideoPhase = 'idle' | 'extracting' | 'analyzing' | 'done' | 'error'
+  const [videoPhase, setVideoPhase] = useState<VideoPhase>('idle')
+  const [videoProgress, setVideoProgress] = useState({ step: 0, total: 0, frames: 0 })
 
   useEffect(() => {
     fetch('/api/subjects')
@@ -77,8 +81,20 @@ export default function UploadPage() {
       .finally(() => setSessionLoading(false))
   }, [subjectId, subjects])
 
+  function isVideoFile(f: File) {
+    return (
+      f.type.startsWith('video/') ||
+      f.name.endsWith('.mp4') ||
+      f.name.endsWith('.mov') ||
+      f.name.endsWith('.avi') ||
+      f.name.endsWith('.mkv') ||
+      f.name.endsWith('.webm')
+    )
+  }
+
   function isValidFile(f: File) {
     return (
+      isVideoFile(f) ||
       f.name.endsWith('.txt') ||
       f.name.endsWith('.md') ||
       f.name.endsWith('.ipynb') ||
@@ -108,23 +124,25 @@ export default function UploadPage() {
     const valid = newFiles.filter(isValidFile)
     const invalid = newFiles.filter((f) => !isValidFile(f))
     if (invalid.length > 0) {
-      setError(`지원하지 않는 파일 형식: ${invalid.map((f) => f.name).join(', ')} (.txt, .md, .ipynb만 가능)`)
+      setError(`지원하지 않는 파일 형식: ${invalid.map((f) => f.name).join(', ')}`)
     } else {
       setError('')
     }
     if (valid.length === 0) return
 
     setFiles((prev) => {
-      // 이미 추가된 파일명 중복 제거
       const existingNames = new Set(prev.map((f) => f.name))
       const filtered = valid.filter((f) => !existingNames.has(f.name))
       const next = [...prev, ...filtered]
 
-      // 파일 내용 읽어서 content 갱신
-      let pending = next.length
-      const contents: string[] = Array(next.length).fill('')
+      // 텍스트 파일만 내용 읽기 (영상 파일 제외)
+      const textFiles = next.filter((f) => !isVideoFile(f))
+      if (textFiles.length === 0) return next
 
-      next.forEach((file, i) => {
+      let pending = textFiles.length
+      const contents: string[] = Array(textFiles.length).fill('')
+
+      textFiles.forEach((file, i) => {
         const reader = new FileReader()
         reader.onload = (e) => {
           const raw = (e.target?.result as string) ?? ''
@@ -146,13 +164,13 @@ export default function UploadPage() {
   function removeFile(name: string) {
     setFiles((prev) => {
       const next = prev.filter((f) => f.name !== name)
-      if (next.length === 0) {
+      const textFiles = next.filter((f) => !isVideoFile(f))
+      if (textFiles.length === 0) {
         setContent('')
       } else {
-        // 남은 파일들 재합산 — addFiles와 동일한 읽기 로직
-        let pending = next.length
-        const contents: string[] = Array(next.length).fill('')
-        next.forEach((file, i) => {
+        let pending = textFiles.length
+        const contents: string[] = Array(textFiles.length).fill('')
+        textFiles.forEach((file, i) => {
           const reader = new FileReader()
           reader.onload = (e) => {
             const raw = (e.target?.result as string) ?? ''
@@ -168,6 +186,150 @@ export default function UploadPage() {
       return next
     })
   }
+
+  // ── 키프레임 추출 (브라우저 Canvas API) ──────────────
+  function seekTo(video: HTMLVideoElement, time: number): Promise<void> {
+    return new Promise((resolve) => {
+      const timeout = setTimeout(resolve, 3000)
+      const handler = () => {
+        clearTimeout(timeout)
+        video.removeEventListener('seeked', handler)
+        resolve()
+      }
+      video.addEventListener('seeked', handler)
+      video.currentTime = time
+    })
+  }
+
+  async function extractKeyframes(
+    videoFile: File,
+    onProgress: (step: number, total: number, frames: number) => void
+  ): Promise<Blob[]> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video')
+      const objectUrl = URL.createObjectURL(videoFile)
+      video.src = objectUrl
+      video.muted = true
+      video.preload = 'metadata'
+
+      const cmpCanvas = document.createElement('canvas') // 비교용 (저해상도)
+      const capCanvas = document.createElement('canvas') // 저장용 (고해상도)
+      cmpCanvas.width = 160;  cmpCanvas.height = 90
+      capCanvas.width = 640;  capCanvas.height = 360
+      const cmpCtx = cmpCanvas.getContext('2d')!
+      const capCtx = capCanvas.getContext('2d')!
+
+      const THRESHOLD = 8   // 픽셀 평균 차이 임계값 (0~255)
+      const MAX_FRAMES = 60 // 최대 키프레임 수
+      const keyframes: Blob[] = []
+
+      video.addEventListener('error', () => {
+        URL.revokeObjectURL(objectUrl)
+        reject(new Error('영상을 읽을 수 없습니다'))
+      })
+
+      video.addEventListener('loadedmetadata', async () => {
+        const duration = video.duration
+        if (!duration || duration === Infinity) {
+          URL.revokeObjectURL(objectUrl)
+          reject(new Error('영상 길이를 확인할 수 없습니다'))
+          return
+        }
+
+        // 30분 이상이면 5초 간격, 이하면 3초 간격
+        const step = duration > 1800 ? 5 : 3
+        const totalSteps = Math.floor(duration / step)
+        let prevPixels: Uint8ClampedArray | null = null
+
+        for (let i = 0; i <= totalSteps && keyframes.length < MAX_FRAMES; i++) {
+          const t = i * step
+          await seekTo(video, t)
+          onProgress(i, totalSteps, keyframes.length)
+
+          // 저해상도로 픽셀 비교
+          cmpCtx.drawImage(video, 0, 0, 160, 90)
+          const currPixels = cmpCtx.getImageData(0, 0, 160, 90).data
+
+          let isKeyframe = prevPixels === null
+          if (prevPixels) {
+            let diffSum = 0
+            for (let p = 0; p < currPixels.length; p += 4) {
+              diffSum += Math.abs(currPixels[p]   - prevPixels[p])
+              diffSum += Math.abs(currPixels[p+1] - prevPixels[p+1])
+              diffSum += Math.abs(currPixels[p+2] - prevPixels[p+2])
+            }
+            isKeyframe = diffSum / (currPixels.length / 4 * 3) > THRESHOLD
+          }
+
+          if (isKeyframe) {
+            // 고해상도로 저장
+            const blob = await new Promise<Blob | null>((res) => {
+              capCtx.drawImage(video, 0, 0, 640, 360)
+              capCanvas.toBlob(res, 'image/jpeg', 0.85)
+            })
+            if (blob) keyframes.push(blob)
+            prevPixels = currPixels
+          }
+        }
+
+        URL.revokeObjectURL(objectUrl)
+        resolve(keyframes)
+      })
+    })
+  }
+
+  async function handleVideoAnalysis() {
+    const videoFile = files.find(isVideoFile)
+    if (!videoFile) return
+
+    setVideoPhase('extracting')
+    setVideoProgress({ step: 0, total: 0, frames: 0 })
+    setError('')
+
+    try {
+      // 1단계: 키프레임 추출
+      const keyframes = await extractKeyframes(videoFile, (step, total, frames) => {
+        setVideoProgress({ step, total, frames })
+      })
+
+      if (keyframes.length === 0) {
+        setError('키프레임을 추출할 수 없습니다. 다른 영상을 시도해보세요.')
+        setVideoPhase('error')
+        return
+      }
+
+      // 2단계: GPT-4o Vision 분석
+      setVideoPhase('analyzing')
+      const formData = new FormData()
+      keyframes.forEach((blob, i) => {
+        formData.append('frames', new File([blob], `frame_${i}.jpg`, { type: 'image/jpeg' }))
+      })
+
+      const res = await fetch('/api/analyze-frames', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error ?? '분석 중 오류가 발생했습니다')
+        setVideoPhase('error')
+        return
+      }
+
+      // 기존 content에 추가
+      setContent((prev) =>
+        prev.trim()
+          ? prev + `\n\n---\n\n[${videoFile.name} — 영상 분석]\n` + data.content
+          : `[${videoFile.name} — 영상 분석]\n` + data.content
+      )
+      setVideoPhase('done')
+    } catch {
+      setError('영상 분석 중 오류가 발생했습니다')
+      setVideoPhase('error')
+    }
+  }
+  // ────────────────────────────────────────────────────
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? [])
@@ -443,7 +605,7 @@ export default function UploadPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.md,.ipynb,text/*"
+              accept=".txt,.md,.ipynb,.mp4,.mov,.avi,.mkv,.webm,text/*,video/*"
               multiple
               onChange={handleFileChange}
               className="hidden"
@@ -454,37 +616,99 @@ export default function UploadPage() {
                 <rect x="4" y="4" width="24" height="24" rx="6" stroke="#9CA3AF" strokeWidth="1.5" />
               </svg>
               <p className="text-sm font-medium">파일을 드래그하거나 탭하여 선택</p>
-              <p className="text-xs">.txt · .md · .ipynb 지원</p>
+              <p className="text-xs">.txt · .md · .ipynb · 영상(.mp4, .mov 등)</p>
             </div>
           </div>
 
           {/* 선택된 파일 목록 */}
           {files.length > 0 && (
             <div className="mt-3 flex flex-col gap-2">
-              {files.map((f) => (
-                <div
-                  key={f.name}
-                  className="flex items-center justify-between bg-primary-light rounded-xl px-3 py-2"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-bold text-primary bg-white px-1.5 py-0.5 rounded-md shrink-0">
-                      {f.name.endsWith('.ipynb') ? 'ipynb' : f.name.endsWith('.md') ? 'md' : 'txt'}
-                    </span>
-                    <span className="text-xs text-gray-700 truncate">{f.name}</span>
-                    <span className="text-xs text-gray-400 shrink-0">{formatSize(f.size)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); removeFile(f.name) }}
-                    className="ml-2 text-gray-400 hover:text-red-400 transition-colors shrink-0"
-                    aria-label={`${f.name} 제거`}
+              {files.map((f) => {
+                const isVid = isVideoFile(f)
+                const ext = isVid ? '영상'
+                  : f.name.endsWith('.ipynb') ? 'ipynb'
+                  : f.name.endsWith('.md') ? 'md' : 'txt'
+                return (
+                  <div
+                    key={f.name}
+                    className="flex items-center justify-between bg-primary-light rounded-xl px-3 py-2"
                   >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  </button>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-md shrink-0 ${isVid ? 'bg-purple-100 text-purple-600' : 'text-primary bg-white'}`}>
+                        {ext}
+                      </span>
+                      <span className="text-xs text-gray-700 truncate">{f.name}</span>
+                      <span className="text-xs text-gray-400 shrink-0">{formatSize(f.size)}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeFile(f.name) }}
+                      className="ml-2 text-gray-400 hover:text-red-400 transition-colors shrink-0"
+                      aria-label={`${f.name} 제거`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </div>
+                )
+              })}
+
+              {/* 영상 분석 버튼 */}
+              {files.some(isVideoFile) && (
+                <div className="mt-1">
+                  {videoPhase === 'idle' || videoPhase === 'error' ? (
+                    <button
+                      type="button"
+                      onClick={handleVideoAnalysis}
+                      className="w-full py-2.5 rounded-xl bg-purple-500 text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-purple-600 transition-colors"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M6 3l7 5-7 5V3z" fill="white" />
+                        <rect x="1" y="3" width="2.5" height="10" rx="1" fill="white" />
+                      </svg>
+                      영상 키프레임 분석 시작
+                    </button>
+                  ) : videoPhase === 'extracting' ? (
+                    <div className="bg-purple-50 rounded-xl px-3 py-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-purple-700">프레임 추출 중...</span>
+                        <span className="text-xs text-purple-500">
+                          키프레임 {videoProgress.frames}개 발견
+                        </span>
+                      </div>
+                      <div className="w-full bg-purple-100 rounded-full h-1.5">
+                        <div
+                          className="bg-purple-500 h-1.5 rounded-full transition-all"
+                          style={{ width: videoProgress.total > 0 ? `${(videoProgress.step / videoProgress.total) * 100}%` : '5%' }}
+                        />
+                      </div>
+                      <p className="text-xs text-purple-400">
+                        {videoProgress.total > 0
+                          ? `${videoProgress.step} / ${videoProgress.total} 구간 처리됨`
+                          : '영상 로드 중...'}
+                      </p>
+                    </div>
+                  ) : videoPhase === 'analyzing' ? (
+                    <div className="bg-purple-50 rounded-xl px-3 py-3 flex items-center gap-3">
+                      <div className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-purple-700">AI 화면 분석 중...</p>
+                        <p className="text-xs text-purple-400">키프레임 {videoProgress.frames}장을 GPT-4o가 분석하고 있어요</p>
+                      </div>
+                    </div>
+                  ) : videoPhase === 'done' ? (
+                    <div className="bg-green-50 rounded-xl px-3 py-2.5 flex items-center gap-2">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8l4 4 6-6" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span className="text-xs font-semibold text-green-700">
+                        영상 분석 완료 — 수업 자료 내용에 추가됐어요
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>

@@ -54,8 +54,10 @@ export async function POST(req: NextRequest) {
     const enhanced =
       completion.choices[0]?.message?.content ?? '해설을 생성하지 못했습니다. 다시 시도해주세요.'
 
-    // 다음 번엔 재사용하도록 DB에 저장 (캐시)
-    await supabaseAdmin.from('questions').update({ explanation: enhanced }).eq('id', question_id)
+    // explanation이 없을 때만 DB에 캐시 저장 (기존 강사 작성 해설 덮어쓰기 방지)
+    if (!question.explanation) {
+      await supabaseAdmin.from('questions').update({ explanation: enhanced }).eq('id', question_id)
+    }
 
     return NextResponse.json({ source: 'enhanced', explanation: enhanced })
   } catch (err) {
