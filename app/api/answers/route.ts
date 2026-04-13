@@ -109,33 +109,37 @@ export async function POST(req: NextRequest) {
     const { question_id, answer, used_hint = false } = await req.json()
     const userId = user.id
 
-    // 서버에서 시도 횟수 직접 계산 (클라이언트 값 신뢰 X)
+    // 오늘(KST) 기준 시도 횟수 계산
+    // 복습 문제는 며칠 후 다시 풀 수 있어야 하므로 당일 시도만 카운트
+    const kstTodayStart = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10) + 'T00:00:00+09:00'
     const { count: prevCount, error: countError } = await supabaseAdmin
       .from('user_answers')
       .select('*', { count: 'exact', head: true })
       .eq('student_id', userId)
       .eq('question_id', question_id)
+      .gte('answered_at', kstTodayStart)
 
     if (countError) throw countError
 
     const attempt = (prevCount ?? 0) + 1
 
-    // 이미 2번 시도한 문제는 더 이상 제출 불가
+    // 오늘 이미 2번 시도한 문제는 더 이상 제출 불가
     if (attempt > 2) {
-      return NextResponse.json({ error: '이미 2번 시도한 문제입니다' }, { status: 400 })
+      return NextResponse.json({ error: '오늘 이미 2번 시도한 문제입니다' }, { status: 400 })
     }
 
-    // 이미 정답을 맞힌 문제는 재제출 불가 (통계/복습 오염 방지)
-    const { data: alreadyCorrect } = await supabaseAdmin
+    // 오늘 이미 정답을 맞힌 문제는 재제출 불가
+    const { data: alreadyCorrectToday } = await supabaseAdmin
       .from('user_answers')
       .select('id')
       .eq('student_id', userId)
       .eq('question_id', question_id)
       .eq('is_correct', true)
+      .gte('answered_at', kstTodayStart)
       .single()
 
-    if (alreadyCorrect) {
-      return NextResponse.json({ error: '이미 정답을 맞힌 문제입니다' }, { status: 400 })
+    if (alreadyCorrectToday) {
+      return NextResponse.json({ error: '오늘 이미 정답을 맞힌 문제입니다' }, { status: 400 })
     }
 
     // 정답 + subject_id 서버에서 직접 조회 (클라이언트 값 신뢰 X)
