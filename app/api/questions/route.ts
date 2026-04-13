@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     // 수업 자료 조회 (subject_id 포함해서 소유권 확인용)
     const { data: lesson, error: lError } = await supabaseAdmin
       .from('lessons')
-      .select('content, title, subject_id')
+      .select('content, title, subject_id, session_number')
       .eq('id', lesson_id)
       .single()
 
@@ -109,7 +109,62 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // OpenAI로 문제 생성
+    // [1단계] 현재 회차 이하 수업 자료 누적 조회 (이전 회차 감지용)
+    const { data: prevLessons } = await supabaseAdmin
+      .from('lessons')
+      .select('content, session_number')
+      .eq('subject_id', lesson.subject_id)
+      .lte('session_number', lesson.session_number ?? 9999)
+
+    const accumulatedContent = (prevLessons ?? [])
+      .map((l) => l.content ?? '')
+      .join('\n')
+
+    // [1단계] AI가 "실제로 가르친 개념"만 추출 (단순 언급/예고 제외)
+    let taughtConcepts: string[] = []
+    try {
+      const conceptExtraction = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `너는 수업 분석 전문가야. 수업 자료를 읽고 실제로 가르친 개념만 추출해.
+
+[판단 기준]
+- 실제로 가르친 개념: 설명이 있고, 예시 코드나 사용 방법이 나와 있는 것
+- 가르친 게 아닌 것: "다음 시간에", "나중에", "추후에", "예고", "참고로만" 등의 표현과 함께 언급된 것
+- 가르친 게 아닌 것: 단순히 단어만 등장하고 설명이 없는 것
+- 가르친 게 아닌 것: 예시 코드 없이 이름만 언급된 것
+
+응답은 반드시 JSON 형식으로: {"taught_concepts": ["개념1", "개념2", ...]}`,
+          },
+          {
+            role: 'user',
+            content: `다음 수업 자료에서 실제로 가르친 개념만 추출해줘. 단순 언급이나 예고된 내용은 절대 포함하지 마.
+
+[수업 자료]
+${accumulatedContent}`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+      })
+      const conceptContent = conceptExtraction.choices[0]?.message?.content
+      if (conceptContent) {
+        const parsed = JSON.parse(conceptContent)
+        taughtConcepts = parsed.taught_concepts ?? []
+      }
+    } catch {
+      // 개념 추출 실패 시 제한 없이 진행 (fallback)
+      taughtConcepts = []
+    }
+
+    const conceptGuide =
+      taughtConcepts.length > 0
+        ? `이 수업에서 실제로 가르친 개념 목록: [${taughtConcepts.join(', ')}]
+이 목록에 없는 개념은 절대 문제에 포함하지 마. 특히 함수(def), 클래스, 재귀 등 목록에 없으면 사용 금지.`
+        : `수업 자료에 명시된 내용만 사용해서 문제를 만들어.`
+
+    // [2단계] OpenAI로 문제 생성
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -138,6 +193,9 @@ export async function POST(req: NextRequest) {
           role: 'user',
           content: `다음 수업 자료에 나온 내용만 사용해서 복습 문제 ${count}개를 만들어줘.
 수업 자료에 없는 개념은 절대 사용하지 마. 수업 자료에 명시된 코드와 개념만 문제로 출제해.
+
+[가르친 개념 범위]
+${conceptGuide}
 
 [수업 자료]
 ${lesson.content}
