@@ -74,7 +74,14 @@ export default function BottomNav() {
   const pathname = usePathname()
 
   const isActive = (href: string) => {
-    if (href === '/dashboard') return pathname === '/dashboard'
+    if (href === '/dashboard') {
+      // 로드맵·문제풀기는 대시보드 홈에서 진입하므로 홈 탭 활성화
+      return (
+        pathname === '/dashboard' ||
+        pathname.startsWith('/subjects') ||
+        pathname.startsWith('/questions')
+      )
+    }
     return pathname.startsWith(href)
   }
 

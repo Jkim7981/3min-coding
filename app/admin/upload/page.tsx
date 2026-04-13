@@ -24,7 +24,7 @@ export default function UploadPage() {
   // 수업 날짜 (YYYY-MM-DD). 미입력 시 즉시 오픈
   const [scheduledDate, setScheduledDate] = useState('')
   const [content, setContent] = useState('')
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const [generatingQuestions, setGeneratingQuestions] = useState(false)
@@ -77,30 +77,110 @@ export default function UploadPage() {
       .finally(() => setSessionLoading(false))
   }, [subjectId, subjects])
 
-  function readFile(f: File) {
-    if (!f.type.startsWith('text/') && !f.name.endsWith('.txt') && !f.name.endsWith('.md')) {
-      setError('텍스트 파일(.txt, .md)만 지원합니다')
-      return
+  function isValidFile(f: File) {
+    return (
+      f.name.endsWith('.txt') ||
+      f.name.endsWith('.md') ||
+      f.name.endsWith('.ipynb') ||
+      f.type.startsWith('text/')
+    )
+  }
+
+  // .ipynb JSON에서 셀 소스 추출 → 텍스트로 변환
+  function parseNotebook(json: string): string {
+    try {
+      const nb = JSON.parse(json)
+      const cells: { cell_type: string; source: string | string[] }[] = nb.cells ?? []
+      return cells
+        .map((cell) => {
+          const src = Array.isArray(cell.source) ? cell.source.join('') : cell.source
+          if (cell.cell_type === 'code') return '```python\n' + src + '\n```'
+          return src
+        })
+        .filter(Boolean)
+        .join('\n\n')
+    } catch {
+      return ''
     }
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      setContent((e.target?.result as string) ?? '')
+  }
+
+  function addFiles(newFiles: File[]) {
+    const valid = newFiles.filter(isValidFile)
+    const invalid = newFiles.filter((f) => !isValidFile(f))
+    if (invalid.length > 0) {
+      setError(`지원하지 않는 파일 형식: ${invalid.map((f) => f.name).join(', ')} (.txt, .md, .ipynb만 가능)`)
+    } else {
       setError('')
     }
-    reader.readAsText(f, 'utf-8')
-    setFile(f)
+    if (valid.length === 0) return
+
+    setFiles((prev) => {
+      // 이미 추가된 파일명 중복 제거
+      const existingNames = new Set(prev.map((f) => f.name))
+      const filtered = valid.filter((f) => !existingNames.has(f.name))
+      const next = [...prev, ...filtered]
+
+      // 파일 내용 읽어서 content 갱신
+      let pending = next.length
+      const contents: string[] = Array(next.length).fill('')
+
+      next.forEach((file, i) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const raw = (e.target?.result as string) ?? ''
+          contents[i] = file.name.endsWith('.ipynb')
+            ? `[${file.name}]\n` + parseNotebook(raw)
+            : `[${file.name}]\n` + raw
+          pending--
+          if (pending === 0) {
+            setContent(contents.join('\n\n---\n\n'))
+          }
+        }
+        reader.readAsText(file, 'utf-8')
+      })
+
+      return next
+    })
+  }
+
+  function removeFile(name: string) {
+    setFiles((prev) => {
+      const next = prev.filter((f) => f.name !== name)
+      if (next.length === 0) {
+        setContent('')
+      } else {
+        // 남은 파일들 재합산 — addFiles와 동일한 읽기 로직
+        let pending = next.length
+        const contents: string[] = Array(next.length).fill('')
+        next.forEach((file, i) => {
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            const raw = (e.target?.result as string) ?? ''
+            contents[i] = file.name.endsWith('.ipynb')
+              ? `[${file.name}]\n` + parseNotebook(raw)
+              : `[${file.name}]\n` + raw
+            pending--
+            if (pending === 0) setContent(contents.join('\n\n---\n\n'))
+          }
+          reader.readAsText(file, 'utf-8')
+        })
+      }
+      return next
+    })
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (f) readFile(f)
+    const selected = Array.from(e.target.files ?? [])
+    if (selected.length > 0) addFiles(selected)
+    // input 초기화 (같은 파일 재선택 허용)
+    e.target.value = ''
   }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragging(false)
-    const f = e.dataTransfer.files?.[0]
-    if (f) readFile(f)
+    const dropped = Array.from(e.dataTransfer.files)
+    if (dropped.length > 0) addFiles(dropped)
   }
 
   function handleDragOver(e: React.DragEvent) {
@@ -238,7 +318,7 @@ export default function UploadPage() {
                 setSuccess(false)
                 setTitle('')
                 setContent('')
-                setFile(null)
+                setFiles([])
                 setScheduledDate('')
               }}
               className="w-full py-3 rounded-2xl bg-primary text-white text-sm font-semibold"
@@ -344,51 +424,69 @@ export default function UploadPage() {
           </div>
         </div>
 
-        {/* 파일 드래그 앤 드롭 */}
+        {/* 파일 드래그 앤 드롭 (다중 선택) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <label className="block text-xs font-semibold text-gray-500 mb-2">파일 업로드</label>
+          <label className="block text-xs font-semibold text-gray-500 mb-2">
+            파일 업로드
+            <span className="ml-1 font-normal text-gray-400">(여러 파일 동시 선택 가능)</span>
+          </label>
           <div
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onClick={() => fileInputRef.current?.click()}
             className={[
-              'border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-colors',
+              'border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-colors',
               dragging ? 'border-primary bg-primary-light' : 'border-gray-200 hover:border-primary/50',
             ].join(' ')}
           >
             <input
               ref={fileInputRef}
               type="file"
-              accept=".txt,.md,text/*"
+              accept=".txt,.md,.ipynb,text/*"
+              multiple
               onChange={handleFileChange}
               className="hidden"
             />
-            {file ? (
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-10 h-10 bg-primary-light rounded-xl flex items-center justify-center">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path d="M11 2H5a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V9l-6-7z" stroke="#185FA5" strokeWidth="1.5" strokeLinejoin="round" />
-                    <path d="M11 2v7h6" stroke="#185FA5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-700">{file.name}</p>
-                  <p className="text-xs text-gray-400">{formatSize(file.size)}</p>
-                </div>
-                <span className="text-xs text-primary font-medium">파일 변경하기</span>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 text-gray-400">
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                  <path d="M16 20V12M16 12l-4 4M16 12l4 4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  <rect x="4" y="4" width="24" height="24" rx="6" stroke="#9CA3AF" strokeWidth="1.5" />
-                </svg>
-                <p className="text-sm font-medium">파일을 드래그하거나 탭하여 선택</p>
-                <p className="text-xs">.txt, .md 파일 지원</p>
-              </div>
-            )}
+            <div className="flex flex-col items-center gap-2 text-gray-400">
+              <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+                <path d="M16 20V12M16 12l-4 4M16 12l4 4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <rect x="4" y="4" width="24" height="24" rx="6" stroke="#9CA3AF" strokeWidth="1.5" />
+              </svg>
+              <p className="text-sm font-medium">파일을 드래그하거나 탭하여 선택</p>
+              <p className="text-xs">.txt · .md · .ipynb 지원</p>
+            </div>
           </div>
+
+          {/* 선택된 파일 목록 */}
+          {files.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2">
+              {files.map((f) => (
+                <div
+                  key={f.name}
+                  className="flex items-center justify-between bg-primary-light rounded-xl px-3 py-2"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-bold text-primary bg-white px-1.5 py-0.5 rounded-md shrink-0">
+                      {f.name.endsWith('.ipynb') ? 'ipynb' : f.name.endsWith('.md') ? 'md' : 'txt'}
+                    </span>
+                    <span className="text-xs text-gray-700 truncate">{f.name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{formatSize(f.size)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeFile(f.name) }}
+                    className="ml-2 text-gray-400 hover:text-red-400 transition-colors shrink-0"
+                    aria-label={`${f.name} 제거`}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 수동 입력 */}
