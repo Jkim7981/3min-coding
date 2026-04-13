@@ -3,6 +3,14 @@
 
 declare const self: ServiceWorkerGlobalScope
 
+// auth API는 캐시 없이 항상 네트워크 직접 호출 (세션 만료 시 캐시된 응답 반환 방지)
+self.addEventListener('fetch', (event: FetchEvent) => {
+  const url = new URL(event.request.url)
+  if (url.pathname.startsWith('/api/auth')) {
+    event.respondWith(fetch(event.request))
+  }
+})
+
 // 푸시 알림 수신
 self.addEventListener('push', (event: PushEvent) => {
   if (!event.data) return

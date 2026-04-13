@@ -1,9 +1,11 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { SubjectCardSkeleton, StatCardSkeleton } from '@/components/ui/Skeleton'
+import { authOptions } from '@/lib/authOptions'
+import { supabaseAdmin } from '@/lib/supabase'
+import type { AuthUser } from '@/lib/auth'
+import SignOutButton from './SignOutButton'
+import PushSubscriber from './PushSubscriber'
 
 interface Subject {
   id: string
@@ -12,102 +14,157 @@ interface Subject {
   created_at: string
 }
 
-interface Stats {
-  total_answered: number
-  correct_rate: number
-  streak: number
-  this_week: number
-}
-
 interface DailyQuestion {
   id: string
   type: string
   difficulty: string
   question: string
+  lesson_id: string
   lessons: { title: string; session_number: number } | null
 }
 
-interface DailyQuestions {
-  new: DailyQuestion[]
-  review: DailyQuestion[]
-  total: number
+interface DashboardData {
+  subjects: Subject[]
+  thisWeek: number
+  streak: number
+  daily: { new: DailyQuestion[]; review: DailyQuestion[]; total: number }
 }
 
-// 푸시 알림 구독 요청
-async function subscribeToPush() {
-  try {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+function toKSTDate(timestamp: string): string {
+  return new Date(new Date(timestamp).getTime() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10)
+}
 
-    const permission = await Notification.requestPermission()
-    if (permission !== 'granted') return
-
-    const reg = await navigator.serviceWorker.ready
-    const existing = await reg.pushManager.getSubscription()
-    if (existing) return // 이미 구독 중
-
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-    })
-
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(sub.toJSON()),
-    })
-  } catch {
-    // 알림 구독 실패는 조용히 무시
+function calcStreak(timestamps: string[]): number {
+  if (timestamps.length === 0) return 0
+  const dates = [...new Set(timestamps.map(toKSTDate))].sort((a, b) => b.localeCompare(a))
+  const today = toKSTDate(new Date().toISOString())
+  const yesterday = toKSTDate(new Date(Date.now() - 86400000).toISOString())
+  if (dates[0] !== today && dates[0] !== yesterday) return 0
+  let streak = 1
+  for (let i = 1; i < dates.length; i++) {
+    const diff = (new Date(dates[i - 1]).getTime() - new Date(dates[i]).getTime()) / 86400000
+    if (diff === 1) streak++
+    else break
   }
+  return streak
 }
 
-export default function DashboardPage() {
-  const { data: session } = useSession()
-  const userName = session?.user?.name ?? '학생'
+async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
+  const userId = user.id
 
-  const [subjects, setSubjects] = useState<Subject[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [dailyQuestions, setDailyQuestions] = useState<DailyQuestions | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [dailyLoading, setDailyLoading] = useState(true)
+  if (user.role === 'teacher') {
+    const { data } = await supabaseAdmin
+      .from('subjects')
+      .select('id, name, teacher_id, created_at')
+      .eq('teacher_id', userId)
+    return { subjects: data ?? [], thisWeek: 0, streak: 0, daily: { new: [], review: [], total: 0 } }
+  }
 
-  useEffect(() => {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10000)
+  // 수강 과목 + 전체 답안 병렬 조회
+  const [enrollmentResult, answersResult] = await Promise.all([
+    supabaseAdmin
+      .from('enrollments')
+      .select('subject_id, subjects(id, name, teacher_id, created_at)')
+      .eq('student_id', userId),
+    supabaseAdmin
+      .from('user_answers')
+      .select('answered_at, question_id, is_correct, subject_id')
+      .eq('student_id', userId)
+      .order('answered_at', { ascending: false }),
+  ])
 
-    Promise.all([
-      fetch('/api/subjects', { signal: controller.signal })
-        .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
-        .then((data) => { if (Array.isArray(data)) setSubjects(data) })
-        .catch(() => {}),
-      fetch('/api/stats', { signal: controller.signal })
-        .then((r) => { if (!r.ok) throw new Error('failed'); return r.json() })
-        .then((data) => setStats(data))
-        .catch(() => {}),
-    ]).finally(() => {
-      clearTimeout(timeout)
-      setLoading(false)
-    })
+  const enrollments = enrollmentResult.data ?? []
+  const subjects = enrollments.map((e) => (e as any).subjects).filter(Boolean) as Subject[]
+  const subjectIds = enrollments.map((e) => e.subject_id)
+  const answers = answersResult.data ?? []
 
-    // 오늘의 문제 별도 조회
-    fetch('/api/daily-questions', { signal: controller.signal })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data) setDailyQuestions(data) })
-      .catch(() => {})
-      .finally(() => setDailyLoading(false))
+  // 이번 주 / 스트릭
+  const mondayUTC = (() => {
+    const nowKST = new Date(Date.now() + 9 * 60 * 60 * 1000)
+    const monday = new Date(nowKST)
+    monday.setUTCDate(nowKST.getUTCDate() - ((nowKST.getUTCDay() + 6) % 7))
+    monday.setUTCHours(0, 0, 0, 0)
+    return new Date(monday.getTime() - 9 * 60 * 60 * 1000)
+  })()
+  const thisWeek = answers.filter((a) => new Date(a.answered_at) >= mondayUTC).length
+  const streak = calcStreak(answers.map((a) => a.answered_at))
 
-    // 푸시 알림 구독 (조용히 처리)
-    subscribeToPush()
+  // 오늘의 문제
+  let daily: DashboardData['daily'] = { new: [], review: [], total: 0 }
 
-    return () => {
-      clearTimeout(timeout)
-      controller.abort()
+  if (subjectIds.length > 0) {
+    const { data: lessons } = await supabaseAdmin
+      .from('lessons')
+      .select('id')
+      .in('subject_id', subjectIds)
+
+    const lessonIds = lessons?.map((l) => l.id) ?? []
+
+    if (lessonIds.length > 0) {
+      const answersInSubjects = answers.filter(
+        (a) => a.subject_id && subjectIds.includes(a.subject_id)
+      )
+      const correctIds = new Set(answersInSubjects.filter((a) => a.is_correct).map((a) => a.question_id))
+      const wrongIds = new Set(answersInSubjects.filter((a) => !a.is_correct).map((a) => a.question_id))
+      const allAnsweredIds = new Set([...correctIds, ...wrongIds])
+
+      const { data: allQuestions } = await supabaseAdmin
+        .from('questions')
+        .select('id, type, difficulty, question, lesson_id, lessons(title, session_number)')
+        .in('lesson_id', lessonIds)
+        .order('created_at', { ascending: true })
+
+      const unsolved = (allQuestions ?? []).filter((q) => !allAnsweredIds.has(q.id))
+      const newQuestions = unsolved.sort(() => Math.random() - 0.5).slice(0, 3) as unknown as DailyQuestion[]
+
+      let reviewQuestions: DailyQuestion[] = []
+      if (wrongIds.size > 0) {
+        const wrongQList = (allQuestions ?? []).filter((q) => wrongIds.has(q.id))
+        const wrongLessonIds = [...new Set(wrongQList.map((q) => q.lesson_id))]
+        const newQIds = new Set(newQuestions.map((q) => q.id))
+        const sameConceptUnsolved = (allQuestions ?? []).filter(
+          (q) =>
+            wrongLessonIds.includes(q.lesson_id) &&
+            !allAnsweredIds.has(q.id) &&
+            !newQIds.has(q.id)
+        )
+        if (sameConceptUnsolved.length >= 2) {
+          reviewQuestions = sameConceptUnsolved.sort(() => Math.random() - 0.5).slice(0, 2) as unknown as DailyQuestion[]
+        } else {
+          const wrongList = wrongQList
+            .filter((q) => !newQIds.has(q.id))
+            .sort(() => Math.random() - 0.5)
+          reviewQuestions = [
+            ...sameConceptUnsolved,
+            ...wrongList.slice(0, 2 - sameConceptUnsolved.length),
+          ].slice(0, 2) as unknown as DailyQuestion[]
+        }
+      }
+
+      daily = {
+        new: newQuestions,
+        review: reviewQuestions,
+        total: newQuestions.length + reviewQuestions.length,
+      }
     }
-  }, [])
+  }
 
-  const difficultyLabel = (d: string) =>
-    d === 'easy' ? '쉬움' : d === 'hard' ? '어려움' : '보통'
-  const difficultyColor = (d: string) =>
-    d === 'easy' ? 'text-green-500' : d === 'hard' ? 'text-red-500' : 'text-yellow-500'
+  return { subjects, thisWeek, streak, daily }
+}
+
+const difficultyLabel = (d: string) =>
+  d === 'easy' ? '쉬움' : d === 'hard' ? '어려움' : '보통'
+const difficultyColor = (d: string) =>
+  d === 'easy' ? 'text-green-500' : d === 'hard' ? 'text-red-500' : 'text-yellow-500'
+
+export default async function DashboardPage() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user) redirect('/login')
+
+  const user = session.user as AuthUser
+  const { subjects, thisWeek, streak, daily } = await fetchDashboardData(user)
 
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -115,45 +172,28 @@ export default function DashboardPage() {
       <div className="pt-4 flex items-start justify-between">
         <div>
           <p className="text-sm text-gray-500">안녕하세요!</p>
-          <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{userName}님 👋</h1>
+          <h1 className="text-2xl font-bold text-primary-dark mt-0.5">{user.name}님 👋</h1>
         </div>
-        <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mt-1 p-1.5 rounded-xl hover:bg-gray-100"
-          aria-label="로그아웃"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M10 11l3-3-3-3M13 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          로그아웃
-        </button>
+        <SignOutButton />
       </div>
 
-      {/* 오늘의 문제 — 핵심 섹션 */}
+      {/* 오늘의 문제 */}
       <section className="bg-primary rounded-2xl p-5 text-white">
         <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-sm font-medium opacity-80">매일 아침 9시</p>
             <p className="font-bold text-lg">오늘의 문제 🔥</p>
           </div>
-          {!dailyLoading && dailyQuestions && (
+          {daily.total > 0 && (
             <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
-              {dailyQuestions.total}문제
+              {daily.total}문제
             </span>
           )}
         </div>
 
-        {dailyLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white/10 rounded-xl h-12 animate-pulse" />
-            ))}
-          </div>
-        ) : dailyQuestions && dailyQuestions.total > 0 ? (
+        {daily.total > 0 ? (
           <div className="flex flex-col gap-2 mb-4">
-            {/* 새 문제 */}
-            {dailyQuestions.new.map((q, i) => (
+            {daily.new.map((q, i) => (
               <Link
                 key={q.id}
                 href={`/questions/${q.id}`}
@@ -168,8 +208,7 @@ export default function DashboardPage() {
                 </span>
               </Link>
             ))}
-            {/* 복습 문제 */}
-            {dailyQuestions.review.map((q, i) => (
+            {daily.review.map((q, i) => (
               <Link
                 key={q.id}
                 href={`/questions/${q.id}`}
@@ -196,15 +235,10 @@ export default function DashboardPage() {
         </Link>
       </section>
 
-      {/* 수강 과목 카드 */}
+      {/* 수강 과목 */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-gray-500">내 과목</h2>
-        {loading ? (
-          <>
-            <SubjectCardSkeleton />
-            <SubjectCardSkeleton />
-          </>
-        ) : subjects.length > 0 ? (
+        {subjects.length > 0 ? (
           subjects.slice(0, 2).map((subject) => (
             <Link
               key={subject.id}
@@ -224,7 +258,6 @@ export default function DashboardPage() {
             <p className="text-sm text-gray-400">수강 중인 과목이 없습니다</p>
           </div>
         )}
-
         <Link
           href="/dashboard/subjects"
           className="text-center text-sm text-primary font-medium py-2 min-h-[44px] flex items-center justify-center"
@@ -235,30 +268,23 @@ export default function DashboardPage() {
 
       {/* 학습 현황 */}
       <section className="grid grid-cols-2 gap-3">
-        {loading ? (
-          <>
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-          </>
-        ) : (
-          <>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <p className="text-xs text-gray-400 mb-1">이번 주 풀이</p>
-              <p className="text-2xl font-bold text-primary-dark">
-                {stats?.this_week ?? 0}
-                <span className="text-sm font-normal text-gray-400 ml-1">문제</span>
-              </p>
-            </div>
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <p className="text-xs text-gray-400 mb-1">연속 학습</p>
-              <p className="text-2xl font-bold text-primary-dark">
-                {stats?.streak ?? 0}
-                <span className="text-sm font-normal text-gray-400 ml-1">일</span>
-              </p>
-            </div>
-          </>
-        )}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <p className="text-xs text-gray-400 mb-1">이번 주 풀이</p>
+          <p className="text-2xl font-bold text-primary-dark">
+            {thisWeek}
+            <span className="text-sm font-normal text-gray-400 ml-1">문제</span>
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <p className="text-xs text-gray-400 mb-1">연속 학습</p>
+          <p className="text-2xl font-bold text-primary-dark">
+            {streak}
+            <span className="text-sm font-normal text-gray-400 ml-1">일</span>
+          </p>
+        </div>
       </section>
+
+      <PushSubscriber />
     </div>
   )
 }
