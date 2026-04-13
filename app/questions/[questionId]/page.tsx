@@ -681,7 +681,9 @@ export default function QuestionPage({
           <button
             onClick={() => nextQuestion
               ? router.push(`/questions/${nextQuestion.id}?sessionId=${sessionId}&subjectId=${subjectId}`)
-              : router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
+              : (subjectId && sessionId)
+                ? router.push(`/subjects/${subjectId}/sessions/${sessionId}`)
+                : router.push('/dashboard')
             }
             className="flex-1 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-500 text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors hover:bg-gray-50"
           >
