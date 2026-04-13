@@ -146,6 +146,33 @@ const teacherTabs = [
       </svg>
     ),
   },
+  {
+    href: '/admin/subjects',
+    label: '과목',
+    icon: (active: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+        <rect x="3" y="2" width="10" height="13" rx="1.5"
+          stroke={active ? '#185FA5' : '#9CA3AF'} strokeWidth="1.8" />
+        <rect x="9" y="7" width="10" height="13" rx="1.5"
+          fill="white" stroke={active ? '#185FA5' : '#9CA3AF'} strokeWidth="1.8" />
+        <path d="M12 11h4M12 14h4"
+          stroke={active ? '#185FA5' : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: '/admin/settings',
+    label: '설정',
+    icon: (active: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 22 22" fill="none">
+        <circle cx="11" cy="11" r="3"
+          stroke={active ? '#185FA5' : '#9CA3AF'} strokeWidth="1.8" />
+        <path
+          d="M11 2v2M11 18v2M2 11h2M18 11h2M4.22 4.22l1.42 1.42M16.36 16.36l1.42 1.42M4.22 17.78l1.42-1.42M16.36 5.64l1.42-1.42"
+          stroke={active ? '#185FA5' : '#9CA3AF'} strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ]
 
 export default function GlobalMenu() {
