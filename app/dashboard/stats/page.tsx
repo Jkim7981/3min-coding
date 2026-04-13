@@ -16,8 +16,8 @@ interface StatsData {
 const WEEK_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 
 // KST 기준 이번 주 월~일 날짜 배열 반환
-function getThisWeekDates(): string[] {
-  const now = new Date(Date.now() + 9 * 3600000)
+function getThisWeekDates(baseDate: string): string[] {
+  const now = new Date(`${baseDate}T00:00:00+09:00`)
   const dayOfWeek = now.getUTCDay() // 0=일, 1=월 ... 6=토
   const monday = new Date(now)
   monday.setUTCDate(now.getUTCDate() - ((dayOfWeek + 6) % 7))
@@ -44,8 +44,8 @@ export default function StatsPage() {
 
   // 활동 있는 날짜 set
   const activeDates = new Set(trend.filter((d) => d.count > 0).map((d) => d.date))
-  const weekDates = getThisWeekDates()
-  const todayKST = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10)
+  const todayKST = trend[trend.length - 1]?.date ?? ''
+  const weekDates = todayKST ? getThisWeekDates(todayKST) : []
 
   if (loading) {
     return (

@@ -2,12 +2,10 @@
 
 // [C 수정 — A 영역] 학생 학습 현황 섹션 및 수업 자료 업로드 카드 제거.
 // 과목 탭(/admin/subjects)으로 기능이 통합되어 홈에서 중복 제거.
-import { useRouter } from 'next/navigation'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 
 export default function AdminPage() {
-  const router = useRouter()
   const { data: session } = useSession()
   const name = session?.user?.name ?? '강사'
 

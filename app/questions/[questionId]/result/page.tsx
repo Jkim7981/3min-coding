@@ -28,9 +28,20 @@ export default function QuestionResultPage({
   const nextQuestionId = searchParams.get('nextQuestionId') ?? ''
 
   const [question, setQuestion] = useState<Question | null>(null)
-  const [explanation, setExplanation] = useState('')
-  const [loadingExplanation, setLoadingExplanation] = useState(false)
-  const [explanationError, setExplanationError] = useState(false)
+  const explanationRequestKey = !isCorrect && studentAnswer ? `${questionId}:${studentAnswer}` : ''
+  const [explanationState, setExplanationState] = useState<{
+    key: string
+    text: string
+    error: boolean
+  }>({
+    key: '',
+    text: '',
+    error: false,
+  })
+
+  const explanation = explanationState.key === explanationRequestKey ? explanationState.text : ''
+  const explanationError = explanationState.key === explanationRequestKey && explanationState.error
+  const loadingExplanation = Boolean(explanationRequestKey) && explanationState.key !== explanationRequestKey
 
   // 문제 텍스트 조회 (세션 문맥 있으면 세션 API, 없으면 단건 API)
   useEffect(() => {
@@ -54,9 +65,7 @@ export default function QuestionResultPage({
 
   // 오답 시 AI 해설 자동 조회 (30초 타임아웃)
   useEffect(() => {
-    if (isCorrect || !studentAnswer) return
-    setLoadingExplanation(true)
-    setExplanationError(false)
+    if (!explanationRequestKey) return
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 30000)
@@ -72,15 +81,25 @@ export default function QuestionResultPage({
         return r.json()
       })
       .then((data) => {
-        if (data.explanation) setExplanation(data.explanation)
-        else setExplanationError(true)
+        setExplanationState({
+          key: explanationRequestKey,
+          text: data.explanation ?? '',
+          error: !data.explanation,
+        })
       })
-      .catch(() => setExplanationError(true))
-      .finally(() => {
-        clearTimeout(timeout)
-        setLoadingExplanation(false)
+      .catch(() => {
+        setExplanationState({
+          key: explanationRequestKey,
+          text: '',
+          error: true,
+        })
       })
-  }, [isCorrect, questionId, studentAnswer])
+
+    return () => {
+      clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [explanationRequestKey, questionId, studentAnswer])
 
   const handleNext = () => {
     if (nextQuestionId) {

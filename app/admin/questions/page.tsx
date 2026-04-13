@@ -94,7 +94,7 @@ export default function AdminQuestionsPage() {
       }
     }
     loadAll()
-  }, [retryKey])
+  }, [filterSubjectId, retryKey])
 
 
   // 로드된 문제만 집계

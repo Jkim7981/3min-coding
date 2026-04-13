@@ -57,6 +57,19 @@ interface DashboardData {
   targetDifficulty: 'easy' | 'medium' | 'hard'
 }
 
+interface EnrollmentRow {
+  subject_id: string
+  subjects: Subject | Subject[] | null
+}
+
+interface AnswerRow {
+  answered_at: string
+  question_id: string
+  is_correct: boolean
+  subject_id: string | null
+  attempt: number
+}
+
 function toKSTDate(timestamp: string): string {
   return new Date(new Date(timestamp).getTime() + 9 * 60 * 60 * 1000)
     .toISOString()
@@ -108,16 +121,13 @@ async function fetchDashboardData(user: AuthUser): Promise<DashboardData> {
       .order('answered_at', { ascending: false }),
   ])
 
-  const enrollments = enrollmentResult.data ?? []
-  const subjects = enrollments.map((e) => (e as any).subjects).filter(Boolean) as Subject[]
+  const enrollments = (enrollmentResult.data ?? []) as EnrollmentRow[]
+  const subjects = enrollments.flatMap((enrollment) => {
+    if (Array.isArray(enrollment.subjects)) return enrollment.subjects
+    return enrollment.subjects ? [enrollment.subjects] : []
+  })
   const subjectIds = enrollments.map((e) => e.subject_id)
-  const answers = (answersResult.data ?? []) as {
-    answered_at: string
-    question_id: string
-    is_correct: boolean
-    subject_id: string | null
-    attempt: number
-  }[]
+  const answers = (answersResult.data ?? []) as AnswerRow[]
 
   // 이번 주 / 스트릭
   const mondayUTC = (() => {
