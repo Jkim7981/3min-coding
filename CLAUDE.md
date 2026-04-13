@@ -15,11 +15,11 @@
 
 | 영역 | 기술 |
 |------|------|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS v4 |
 | Backend | Next.js API Routes |
 | Database | Supabase (PostgreSQL) |
-| AI | OpenAI API (gpt-4o) |
-| 코드 실행 | Piston API (완전 무료, API 키 불필요) |
+| AI | OpenAI API (gpt-4o, gpt-4o-mini) |
+| 코드 실행 | Judge0 CE (https://ce.judge0.com) |
 | 배포 | Vercel |
 | 인증 | NextAuth.js |
 | PWA | next-pwa |
@@ -35,7 +35,13 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 NEXTAUTH_SECRET=
 NEXTAUTH_URL=http://localhost:3000
+CRON_SECRET=
+VAPID_MAILTO=
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
 ```
+
+> ⚠️ 실제 키 값은 절대 커밋하지 않는다. 값은 `.env.local`에만 보관.
 
 ---
 
@@ -47,7 +53,7 @@ NEXTAUTH_URL=http://localhost:3000
 
 **문제 유형 2가지:**
 - **개념 문제**: 객관식 / 단답형 (이론, 용어 이해)
-- **코딩 문제**: 빈칸 채우기 형식 (코드 일부를 `___`로 비워둠) + Piston API로 실제 실행
+- **코딩 문제**: 빈칸 채우기 형식 (코드 일부를 `___`로 비워둠) + Judge0으로 실제 실행
 
 **프롬프트 구조 (문제 생성):**
 ```
@@ -135,7 +141,7 @@ user: 문제: {question}
 
 ---
 
-### 4. 코드 실행 (Piston API)
+### 4. 코드 실행 (Judge0 CE)
 
 코딩 문제(빈칸 채우기)에서 학생이 빈칸을 채우면 실제로 코드를 실행해 결과를 보여준다.
 
@@ -143,29 +149,53 @@ user: 문제: {question}
 
 **API 호출:**
 ```
-POST https://emkc.org/api/v2/piston/execute
+POST https://ce.judge0.com/submissions?base64_encoded=false&wait=true
 Headers:
   Content-Type: application/json
 Body:
   {
-    "language": "python",
-    "version": "*",
-    "files": [{ "content": "완성된 코드" }],
+    "language_id": 71,
+    "source_code": "완성된 코드",
     "stdin": ""
   }
 ```
 
-- 완전 무료, API 키 불필요
-- 실행 결과(stdout)를 화면에 표시
-- 예상 출력값과 비교해 정오답 판정
+**language_id 매핑:**
+- Python: 71
+- JavaScript: 63
+- Java: 62
+
+- 테스트 케이스 모드: 함수명 자동 추출 후 러너 코드 삽입해 케이스별 통과 여부 판정
+- 실행 타임아웃: 15초
 
 ---
 
-### 5. 주간/월간 취약점 분석 리포트
+### 5. SM-2 간격 반복 알고리즘
+
+학생 오답을 SM-2 알고리즘으로 복습 스케줄링한다. `lib/sm2.ts` 참고.
+
+**quality 점수 기준:**
+```
+5 = 1차 시도 정답 (완벽)
+3 = 2차 시도 정답 (힌트 후 맞춤)
+1 = 2차 시도 오답 (완전히 모름)
+```
+
+**복습 간격:**
+```
+1회 → 1일
+2회 → 6일
+3회~ → interval × EF (EF 최소 1.3, 최대 60일)
+```
+
+- 답안 제출 시 자동으로 `review_schedule` 테이블에 `next_review_date` 저장
+- 대시보드 복습 탭: `next_review_date <= 오늘` 조건으로 오늘 복습할 문제 표시
+
+---
+
+### 6. 주간/월간 취약점 분석 리포트
 
 학생의 오답 히스토리를 분석해 취약 패턴을 감지하고 주기적으로 알려준다.
-
-**트리거:** 매주 월요일 / 매월 1일 (푸시 알림)
 
 **분석 프롬프트:**
 ```
@@ -193,12 +223,36 @@ create table users (
   created_at timestamptz default now()
 );
 
+-- 학원 멤버 (회원가입 코드 관리)
+create table academy_members (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  name text not null,
+  role text check (role in ('student', 'teacher')),
+  used boolean default false
+);
+
+-- 학원 멤버별 수강 과목
+create table academy_member_subjects (
+  id uuid primary key default gen_random_uuid(),
+  member_id uuid references academy_members(id),
+  subject_name text not null
+);
+
 -- 과목
 create table subjects (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   teacher_id uuid references users(id),
   created_at timestamptz default now()
+);
+
+-- 과목 커리큘럼 (총 회차 수 등)
+create table academy_curriculum (
+  id uuid primary key default gen_random_uuid(),
+  subject_id uuid references subjects(id),
+  total_sessions int,
+  description text
 );
 
 -- 수강 관계
@@ -231,6 +285,8 @@ create table questions (
   answer text not null,
   hint text,
   explanation text,
+  test_cases jsonb,
+  concept_tags text[],
   created_at timestamptz default now()
 );
 
@@ -245,6 +301,28 @@ create table user_answers (
   is_correct boolean,
   used_hint boolean default false,
   answered_at timestamptz default now()
+);
+
+-- SM-2 복습 스케줄
+create table review_schedule (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid references users(id),
+  question_id uuid references questions(id),
+  interval_days int default 1,
+  easiness_factor float default 2.5,
+  repetition_count int default 0,
+  next_review_date date,
+  wrong_count int default 0,
+  correct_count int default 0,
+  updated_at timestamptz default now()
+);
+
+-- PWA 푸시 구독
+create table push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references users(id),
+  subscription jsonb not null,
+  created_at timestamptz default now()
 );
 
 -- 취약점 리포트
@@ -265,25 +343,49 @@ create table weakness_reports (
 ```
 /api
   /auth
-    /[...nextauth]       # NextAuth 인증
+    /[...nextauth]          # NextAuth 인증
+    /signup                 # 회원가입 (학원코드 검증 + 과목 자동 연결)
   /subjects
-    GET                  # 내 과목 목록
-  /lessons
-    POST                 # 수업 자료 업로드 (강사)
+    GET                     # 내 과목 목록 (역할별)
+    POST                    # 과목 생성 (강사)
+  /sessions
+    POST                    # 수업 자료 업로드 (강사)
+  /subjects/[id]/sessions
+    GET                     # 과목별 회차 목록
+  /enrollments
+    POST                    # 수강 등록
+    DELETE                  # 수강 취소
   /questions
-    POST                 # AI 문제 생성 요청 (강사)
-    GET                  # 오늘의 문제 조회 (학생)
+    POST                    # AI 문제 생성 (강사)
+    GET                     # 오늘의 문제 조회
+  /questions/[id]
+    GET                     # 단일 문제 조회 (answer 필드 제외)
+  /daily-questions
+    GET                     # 오늘의 문제 5개 (3 신규 + 2 SM-2 복습)
   /answers
-    POST                 # 답안 제출
+    GET                     # 이전 답안 조회 (복습 모드용)
+    POST                    # 답안 제출 (정규화 → OpenAI 의미 비교 → SM-2 업데이트)
+  /reviews
+    GET                     # 오늘 SM-2 복습 예정 문제 조회
+    POST                    # 복습 답안 제출 및 스케줄 업데이트
   /explanation
-    POST                 # 오답 해설 생성 (2차 오답 시 자동 호출)
+    POST                    # 오답 해설 생성 (AI)
   /execute
-    POST                 # Piston API 코드 실행
+    POST                    # Judge0 코드 실행 (Python / JavaScript / Java)
   /difficulty
-    GET                  # 학생별 과목별 현재 난이도 조회
+    GET                     # 학생별 현재 난이도 조회
+  /stats
+    GET                     # 학습 통계 (정답률, 스트릭, 이번 주, 취약 개념 등)
+  /analytics/weak-concepts
+    GET                     # 최근 오답 기반 취약 개념 Top N
   /reports
-    GET                  # 취약점 리포트 조회
-    POST                 # 리포트 생성 (주간/월간 트리거)
+    GET                     # 취약점 리포트 조회
+    POST                    # 리포트 생성 (주간/월간)
+  /push/subscribe
+    POST                    # PWA 푸시 구독 등록
+    DELETE                  # 푸시 구독 해제
+  /cron/daily-notify
+    GET                     # Vercel Cron — 매일 KST 09:00 푸시 알림 발송
 ```
 
 ---
@@ -291,37 +393,42 @@ create table weakness_reports (
 ## 페이지 구조
 
 ```
-/                        # 홈 (로그인 전: 랜딩, 로그인 후: 대시보드로 리다이렉트)
-/login                   # 로그인
-/dashboard               # 학생 메인 (오늘의 문제, 학습 현황)
-  /subjects              # 과목 목록
-  /questions/[id]        # 문제 풀기 (2단계 오답 플로우)
-  /report                # 취약점 리포트
-/admin                   # 강사 관리자
-  /upload                # 수업 자료 업로드
-  /questions             # 생성된 문제 확인/수정
-  /schedule              # 배포 스케줄 설정
+/                           # 홈 (로그인 전: 랜딩, 로그인 후: 대시보드로 리다이렉트)
+/login                      # 로그인 / 회원가입
+/dashboard                  # 학생 메인 (오늘의 문제, 학습 현황)
+  /subjects                 # 과목 목록
+  /stats                    # 학습 통계 (스트릭, 정답률, 취약 개념)
+  /report                   # 취약점 리포트
+  /settings                 # 설정
+/questions/[id]             # 문제 풀기 (2단계 오답 플로우)
+  /result                   # 문제 결과 + AI 해설
+/subjects/[id]              # 과목 상세
+  /sessions/[sessionId]     # 회차별 문제 목록
+/admin                      # 강사 관리자
+  /upload                   # 수업 자료 업로드 + AI 문제 생성
+  /questions                # 생성된 문제 확인/수정
+  /settings                 # 강사 설정
 ```
 
 ---
 
 ## 개발 우선순위
 
-### 🔴 필수 (반드시 완성)
-1. 로그인/회원가입 (NextAuth)
-2. 수업 자료 업로드
-3. OpenAI 문제 생성
-4. 문제 풀기 + 2단계 오답 플로우
-5. 적응형 난이도 (difficulty 파라미터)
-6. 오답 자동 해설
-7. Vercel 배포
+### 🔴 필수 (완성)
+1. 로그인/회원가입 (NextAuth + 학원코드) ✅
+2. 수업 자료 업로드 ✅
+3. OpenAI 문제 생성 ✅
+4. 문제 풀기 + 2단계 오답 플로우 ✅
+5. 적응형 난이도 ✅
+6. 오답 자동 해설 ✅
+7. Vercel 배포 ✅
 
-### 🟡 중요 (최대한 완성)
-8. 빈칸 채우기 + Piston API 코드 실행
-9. 힌트 버튼
-10. 취약점 리포트 (주간/월간)
-11. PWA + 푸시 알림
-12. 학습 대시보드 (정답률, 스트릭)
+### 🟡 중요 (완성)
+8. 빈칸 채우기 + Judge0 코드 실행 ✅
+9. 힌트 버튼 ✅
+10. 취약점 리포트 (주간/월간) ✅
+11. PWA + 푸시 알림 ✅
+12. 학습 대시보드 (정답률, 스트릭, SM-2 복습) ✅
 
 ### 🟢 선택 (시간 남으면)
 13. 관리자 배포 스케줄링 UI
@@ -374,7 +481,8 @@ create table weakness_reports (
 ## 참고 링크
 
 - 기획서: https://jinjoooppa.tistory.com/35
-- Piston API Docs: https://github.com/engineer-man/piston
+- Judge0 CE: https://ce.judge0.com
 - OpenAI API Docs: https://platform.openai.com/docs
 - Supabase Docs: https://supabase.com/docs
 - Next.js App Router: https://nextjs.org/docs/app
+- SM-2 알고리즘: https://www.supermemo.com/en/archives1990-2015/english/ol/sm2
